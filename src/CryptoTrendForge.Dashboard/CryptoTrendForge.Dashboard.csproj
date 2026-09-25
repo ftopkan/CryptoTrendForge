@@ -3,9 +3,12 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Ensure static files exist on disk for IIS/Plesk (not only SWA manifest). -->
+    <CopyStaticWebAssetsToOutputDirectory>true</CopyStaticWebAssetsToOutputDirectory>
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Update="wwwroot/**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Update="appsettings.Production.local.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('appsettings.Production.local.json')" />
   </ItemGroup>
 
