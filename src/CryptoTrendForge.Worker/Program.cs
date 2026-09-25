@@ -9,6 +9,10 @@ using Microsoft.Extensions.Options;
 using Serilog;
 
 var builder = Host.CreateApplicationBuilder(args);
+builder.Configuration.AddJsonFile(
+    $"appsettings.{builder.Environment.EnvironmentName}.local.json",
+    optional: true,
+    reloadOnChange: true);
 builder.Services.AddSerilog(config => config.WriteTo.Console());
 
 builder.Services.AddSingleton<IValidateOptions<BotOptions>, BotOptionsValidator>();

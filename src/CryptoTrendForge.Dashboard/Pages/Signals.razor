@@ -12,7 +12,7 @@
 }
 else
 {
-    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+    <div class="filter-bar">
         <input placeholder="SYMBOL (e.g XRPUSDT)" @bind="filter.Symbol" />
         <input type="number" placeholder="Min Score" @bind="minScoreInput" />
         <select @bind="statusText">
@@ -36,24 +36,24 @@ else
         <button @onclick="Load">Filter</button>
     </div>
 
-    <table style="width:100%; border-collapse: collapse;">
+    <table class="data-table">
         <thead>
             <tr>
-                <th style="text-align:left;">Id</th>
-                <th style="text-align:left;">Symbol</th>
-                <th style="text-align:left;">Total</th>
-                <th style="text-align:left;">Base</th>
-                <th style="text-align:left;">Pattern</th>
-                <th style="text-align:left;">Status</th>
-                <th style="text-align:left;">Regime</th>
-                <th style="text-align:left;">Type</th>
-                <th style="text-align:left;">Time (UTC)</th>
+                <th>Id</th>
+                <th>Symbol</th>
+                <th>Total</th>
+                <th>Base</th>
+                <th>Pattern</th>
+                <th>Status</th>
+                <th>Regime</th>
+                <th>Type</th>
+                <th>Time (UTC)</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var item in signals)
             {
-                <tr style="border-top: 1px solid #eee;">
+                <tr>
                     <td><a href="/signals/@item.Id">@item.Id</a></td>
                     <td>@item.Symbol</td>
                     <td>@item.TotalScore</td>

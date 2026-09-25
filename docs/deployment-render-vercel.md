@@ -46,6 +46,17 @@ Production'da MSSQL kullanmak icin iki deger zorunlu:
 
 Development'ta PostgreSQL kullanmaya devam edebilirsin (`Database:Provider=Postgres`).
 
+## Plesk MSSQL
+
+Production connection string (password'u Plesk environment variable olarak ver, repoya commit etme):
+
+```
+Database__Provider=SqlServer
+ConnectionStrings__DefaultConnection=Server=localhost;Database=trendforge_;User Id=trendforge;Password=YOUR_PASSWORD;Encrypt=True;TrustServerCertificate=True;
+```
+
+Alternatif: sunucuda `appsettings.Production.local.json` dosyasina sadece password satirini ekle (gitignore'da).
+
 ## Migration Projeleri
 
 - PostgreSQL: `src/CryptoTrendForge.Core.Migrations.Postgres`

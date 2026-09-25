@@ -5,17 +5,21 @@
 
 <h3>Dashboard Login</h3>
 
-<div style="max-width: 320px;">
-    <label>Username</label>
-    <input @bind="username" style="width: 100%;" />
-    <label style="margin-top: 10px;">Password</label>
-    <input type="password" @bind="password" style="width: 100%;" />
-    <button @onclick="SignIn" style="margin-top: 10px;">Sign In</button>
+<div class="card">
+    <div class="form-group">
+        <label>Username</label>
+        <input @bind="username" />
+    </div>
+    <div class="form-group">
+        <label>Password</label>
+        <input type="password" @bind="password" />
+    </div>
+    <button @onclick="SignIn">Sign In</button>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(error))
 {
-    <p style="color: #b00020;">@error</p>
+    <p class="error-text">@error</p>
 }
 
 @code {
