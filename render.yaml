@@ -7,6 +7,8 @@ services:
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      - key: Database__Provider
+        value: SqlServer
       - key: ConnectionStrings__DefaultConnection
         sync: false
       - key: DashboardAuth__Username
@@ -22,6 +24,8 @@ services:
     envVars:
       - key: DOTNET_ENVIRONMENT
         value: Production
+      - key: Database__Provider
+        value: SqlServer
       - key: ConnectionStrings__DefaultConnection
         sync: false
       - key: Telegram__BotToken

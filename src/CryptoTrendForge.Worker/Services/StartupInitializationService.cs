@@ -21,6 +21,14 @@ public sealed class StartupInitializationService : IHostedService
         using var scope = _serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+        if (dbContext.Database.IsSqlServer())
+        {
+            _logger.LogInformation("Ensuring SQL Server schema exists...");
+            await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+            _logger.LogInformation("SQL Server schema check completed.");
+            return;
+        }
+
         _logger.LogInformation("Applying pending database migrations...");
         await dbContext.Database.MigrateAsync(cancellationToken);
         _logger.LogInformation("Database migration check completed.");

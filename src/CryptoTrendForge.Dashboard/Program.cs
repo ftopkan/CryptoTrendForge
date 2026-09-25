@@ -17,7 +17,15 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-    options.UseNpgsql(connectionString);
+    var databaseProvider = builder.Configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>()?.Provider ?? "Postgres";
+    if (databaseProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseSqlServer(connectionString);
+    }
+    else
+    {
+        options.UseNpgsql(connectionString);
+    }
 });
 builder.Services
     .AddOptions<DashboardAuthOptions>()

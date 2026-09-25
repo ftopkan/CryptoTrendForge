@@ -28,6 +28,7 @@ https://dashboard.render.com/blueprint/new?repo=https://github.com/ftopkan/Crypt
 ### Ortak
 
 - `ConnectionStrings__DefaultConnection` -> PostgreSQL baglanti metni
+- `Database__Provider` -> `SqlServer` (production icin)
 
 ### Worker
 
@@ -35,6 +36,15 @@ https://dashboard.render.com/blueprint/new?repo=https://github.com/ftopkan/Crypt
 - `Telegram__ChatId`
 - `Telegram__AdminChatId` (opsiyonel)
 - `Telegram__AdminAlertsEnabled` (`true`/`false`)
+
+## MSSQL Production Notu
+
+Production'da MSSQL kullanmak icin iki deger zorunlu:
+
+- `Database__Provider=SqlServer`
+- `ConnectionStrings__DefaultConnection=Server=<host>;Database=<db>;User Id=<user>;Password=<pass>;Encrypt=True;TrustServerCertificate=True;`
+
+Development'ta PostgreSQL kullanmaya devam edebilirsin (`Database:Provider=Postgres`).
 
 ### Dashboard
 

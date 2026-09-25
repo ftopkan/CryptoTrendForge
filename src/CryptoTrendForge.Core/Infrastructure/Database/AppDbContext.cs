@@ -1,5 +1,7 @@
+using System.Text.Json;
 using CryptoTrendForge.Core.Domain.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace CryptoTrendForge.Core.Infrastructure.Database;
 
@@ -17,6 +19,15 @@ public sealed class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        var isNpgsql = Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
+        var jsonType = isNpgsql ? "jsonb" : "nvarchar(max)";
+        var nowSql = isNpgsql ? "NOW()" : "GETUTCDATE()";
+        var jsonDocumentConverter = new ValueConverter<JsonDocument?, string?>(
+            value => value == null ? null : value.RootElement.GetRawText(),
+            value => string.IsNullOrWhiteSpace(value)
+                ? null
+                : JsonDocument.Parse(value, new JsonDocumentOptions()));
+
         modelBuilder.Entity<Coin>(entity =>
         {
             entity.ToTable("coins");
@@ -24,7 +35,7 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.Symbol).HasMaxLength(20).IsRequired();
             entity.Property(x => x.DisplayName).HasMaxLength(10).IsRequired();
             entity.Property(x => x.IsActive).HasDefaultValue(true);
-            entity.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
+            entity.Property(x => x.CreatedAt).HasDefaultValueSql(nowSql);
             entity.HasIndex(x => x.Symbol).IsUnique();
         });
 
@@ -45,11 +56,19 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.Pattern1H4H).HasMaxLength(50);
             entity.Property(x => x.Pattern15M).HasMaxLength(50);
             entity.Property(x => x.BtcTrend).HasMaxLength(10);
-            entity.Property(x => x.ScoreBreakdown).HasColumnType("jsonb");
-            entity.Property(x => x.Reasons).HasColumnType("jsonb");
-            entity.Property(x => x.Risks).HasColumnType("jsonb");
-            entity.Property(x => x.RawSnapshot).HasColumnType("jsonb");
-            entity.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
+            entity.Property(x => x.ScoreBreakdown)
+                .HasConversion(jsonDocumentConverter)
+                .HasColumnType(jsonType);
+            entity.Property(x => x.Reasons)
+                .HasConversion(jsonDocumentConverter)
+                .HasColumnType(jsonType);
+            entity.Property(x => x.Risks)
+                .HasConversion(jsonDocumentConverter)
+                .HasColumnType(jsonType);
+            entity.Property(x => x.RawSnapshot)
+                .HasConversion(jsonDocumentConverter)
+                .HasColumnType(jsonType);
+            entity.Property(x => x.CreatedAt).HasDefaultValueSql(nowSql);
             entity.HasOne(x => x.Coin)
                 .WithMany()
                 .HasForeignKey(x => x.CoinId);
@@ -61,7 +80,7 @@ public sealed class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.Property(x => x.PriceAt).HasColumnType("numeric(18,8)");
             entity.Property(x => x.PriceChangePct).HasColumnType("numeric(8,2)");
-            entity.Property(x => x.CreatedAt).HasDefaultValueSql("NOW()");
+            entity.Property(x => x.CreatedAt).HasDefaultValueSql(nowSql);
             entity.HasIndex(x => new { x.SignalId, x.MinutesElapsed }).IsUnique();
             entity.HasOne(x => x.Signal)
                 .WithMany()
@@ -74,7 +93,7 @@ public sealed class AppDbContext : DbContext
             entity.HasKey(x => x.Key);
             entity.Property(x => x.Key).HasMaxLength(100);
             entity.Property(x => x.Value).IsRequired();
-            entity.Property(x => x.UpdatedAt).HasDefaultValueSql("NOW()");
+            entity.Property(x => x.UpdatedAt).HasDefaultValueSql(nowSql);
         });
     }
 }
