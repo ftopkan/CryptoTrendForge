@@ -1,0 +1,63 @@
+@page "/signals/{SignalId:int}"
+@inject DashboardDataService DataService
+@inject DashboardSession Session
+
+<h3>Signal Detail</h3>
+
+@if (!Session.IsAuthenticated)
+{
+    <p>You must log in first.</p>
+    <a href="/login">Go to Login</a>
+}
+else if (detail is null)
+{
+    <p>Signal not found.</p>
+}
+else
+{
+    <p><b>Signal:</b> #@detail.Id - @detail.Symbol</p>
+    <p><b>Type:</b> @detail.SignalType | <b>Status:</b> @detail.Status | <b>Regime:</b> @detail.Regime</p>
+    <p><b>Scores:</b> Base @detail.BaseScore / Pattern @detail.PatternBonus / Total @detail.TotalScore</p>
+    <p><b>Support:</b> @detail.SupportLevel (distance %@detail.SupportDistPct)</p>
+    <p><b>Funding:</b> @detail.FundingRate</p>
+    <p><b>Pattern (1H/4H):</b> @(detail.PatternMain ?? "None")</p>
+    <p><b>Pattern (15M):</b> @(detail.Pattern15m ?? "None")</p>
+
+    <ScoreBreakdownCard Breakdown="@detail.Breakdown" />
+    <OutcomeChart Outcomes="@detail.Outcomes" />
+
+    <h4>Reasons</h4>
+    <ul>
+        @foreach (var reason in detail.Reasons)
+        {
+            <li>@reason</li>
+        }
+    </ul>
+
+    @if (detail.Risks.Count > 0)
+    {
+        <h4>Risks</h4>
+        <ul>
+            @foreach (var risk in detail.Risks)
+            {
+                <li>@risk</li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    [Parameter] public int SignalId { get; set; }
+
+    private SignalDetailView? detail;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.IsAuthenticated)
+        {
+            return;
+        }
+
+        detail = await DataService.GetSignalDetailAsync(SignalId);
+    }
+}

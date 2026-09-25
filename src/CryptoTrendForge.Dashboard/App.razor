@@ -1,0 +1,13 @@
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <div style="padding: 12px; border-bottom: 1px solid #ddd; margin-bottom: 16px;">
+            <a href="/signals" style="margin-right: 12px;">Signals</a>
+            <a href="/performance" style="margin-right: 12px;">Performance</a>
+            <a href="/login">Login</a>
+        </div>
+        <RouteView RouteData="@routeData" />
+    </Found>
+    <NotFound>
+        <h1>Sayfa bulunamadi</h1>
+    </NotFound>
+</Router>

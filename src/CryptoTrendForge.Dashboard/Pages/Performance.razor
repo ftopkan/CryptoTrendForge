@@ -1,0 +1,64 @@
+@page "/performance"
+@inject DashboardDataService DataService
+@inject DashboardSession Session
+
+<h3>Performance</h3>
+
+@if (!Session.IsAuthenticated)
+{
+    <p>You must log in first.</p>
+    <a href="/login">Go to Login</a>
+}
+else if (snapshot is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <p><b>Signals (t+1h):</b> @snapshot.TotalSignalsAt1H</p>
+    <p><b>Overall Success Rate:</b> %@snapshot.OverallSuccessRatePct</p>
+    <p><b>Avg Change t+1h:</b> %@snapshot.AvgChange1HPct</p>
+    <p><b>Avg Change t+4h:</b> %@snapshot.AvgChange4HPct</p>
+    <p><b>Pattern Bonus Success:</b> %@snapshot.PatternWithSuccessRate</p>
+    <p><b>No Pattern Bonus Success:</b> %@snapshot.PatternWithoutSuccessRate</p>
+
+    <h4>By Coin</h4>
+    <table style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr><th style="text-align:left;">Coin</th><th style="text-align:left;">Signals</th><th style="text-align:left;">Success %</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var b in snapshot.CoinBuckets)
+            {
+                <tr style="border-top:1px solid #eee;"><td>@b.Key</td><td>@b.Total</td><td>@b.SuccessRatePct</td></tr>
+            }
+        </tbody>
+    </table>
+
+    <h4>By Regime</h4>
+    <table style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr><th style="text-align:left;">Regime</th><th style="text-align:left;">Signals</th><th style="text-align:left;">Success %</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var b in snapshot.RegimeBuckets)
+            {
+                <tr style="border-top:1px solid #eee;"><td>@b.Key</td><td>@b.Total</td><td>@b.SuccessRatePct</td></tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private PerformanceSnapshot? snapshot;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsAuthenticated)
+        {
+            return;
+        }
+
+        snapshot = await DataService.GetPerformanceAsync();
+    }
+}

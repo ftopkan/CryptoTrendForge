@@ -1,0 +1,32 @@
+## Build results
+**/bin/
+**/obj/
+**/out/
+
+## IDE / OS
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+.DS_Store
+
+## Secrets and local config
+.env
+.env.*
+!.env.example
+**/appsettings.Development.json
+**/secrets.json
+
+## Test / coverage
+TestResults/
+coverage/
+*.coverage
+
+## NuGet
+*.nupkg
+*.snupkg
+packages/
+
+## Logs
+*.log

@@ -1,0 +1,12 @@
+@page "/"
+@inject NavigationManager Navigation
+
+<h3>CryptoTrendForge Dashboard</h3>
+<p>Dashboard hazır. Signals sayfasına yönlendiriliyorsunuz...</p>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo("/signals");
+    }
+}

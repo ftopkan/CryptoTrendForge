@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: cryptotrendforge-dashboard
+    runtime: docker
+    dockerfilePath: ./src/CryptoTrendForge.Dashboard/Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: DashboardAuth__Username
+        sync: false
+      - key: DashboardAuth__Password
+        sync: false
+
+  - type: worker
+    name: cryptotrendforge-worker
+    runtime: docker
+    dockerfilePath: ./src/CryptoTrendForge.Worker/Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: DOTNET_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Telegram__BotToken
+        sync: false
+      - key: Telegram__ChatId
+        sync: false
+      - key: Telegram__AdminChatId
+        sync: false
+      - key: Telegram__AdminAlertsEnabled
+        value: "true"
+      - key: Bybit__BaseUrl
+        value: https://api.bybit.com
+      - key: Bybit__TimeoutSeconds
+        value: "10"
+      - key: Bybit__MaxRetries
+        value: "3"

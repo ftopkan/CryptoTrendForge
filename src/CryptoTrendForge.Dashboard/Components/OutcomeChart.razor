@@ -1,0 +1,33 @@
+@if (Outcomes.Count == 0)
+{
+    <p>No outcomes captured yet.</p>
+}
+else
+{
+    <h4>Outcome Points</h4>
+    <table style="width:100%; border-collapse: collapse; margin-bottom: 12px;">
+        <thead>
+            <tr>
+                <th style="text-align:left;">Minutes</th>
+                <th style="text-align:left;">Price</th>
+                <th style="text-align:left;">Change %</th>
+                <th style="text-align:left;">Snapshot UTC</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Outcomes)
+            {
+                <tr style="border-top:1px solid #eee;">
+                    <td>@item.MinutesElapsed</td>
+                    <td>@item.PriceAt</td>
+                    <td>@item.PriceChangePct</td>
+                    <td>@item.SnapshotAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter] public List<OutcomePoint> Outcomes { get; set; } = [];
+}

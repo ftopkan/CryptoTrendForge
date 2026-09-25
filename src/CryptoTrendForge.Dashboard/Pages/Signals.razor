@@ -1,0 +1,94 @@
+@page "/signals"
+@inject DashboardDataService DataService
+@inject DashboardSession Session
+@inject NavigationManager Navigation
+
+<h3>Signals</h3>
+
+@if (!Session.IsAuthenticated)
+{
+    <p>You must log in first.</p>
+    <a href="/login">Go to Login</a>
+}
+else
+{
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+        <input placeholder="SYMBOL (e.g BTCUSDT)" @bind="filter.Symbol" />
+        <input type="number" placeholder="Min Score" @bind="minScoreInput" />
+        <select @bind="statusText">
+            <option value="">All Status</option>
+            @foreach (var status in Enum.GetValues<SignalStatus>())
+            {
+                <option value="@status">@status</option>
+            }
+        </select>
+        <select @bind="regimeText">
+            <option value="">All Regimes</option>
+            @foreach (var regime in Enum.GetValues<MarketRegime>())
+            {
+                <option value="@regime">@regime</option>
+            }
+        </select>
+        <label>
+            <input type="checkbox" @bind="filter.PatternBonusOnly" />
+            Pattern Bonus Only
+        </label>
+        <button @onclick="Load">Filter</button>
+    </div>
+
+    <table style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th style="text-align:left;">Id</th>
+                <th style="text-align:left;">Symbol</th>
+                <th style="text-align:left;">Total</th>
+                <th style="text-align:left;">Base</th>
+                <th style="text-align:left;">Pattern</th>
+                <th style="text-align:left;">Status</th>
+                <th style="text-align:left;">Regime</th>
+                <th style="text-align:left;">Type</th>
+                <th style="text-align:left;">Time (UTC)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in signals)
+            {
+                <tr style="border-top: 1px solid #eee;">
+                    <td><a href="/signals/@item.Id">@item.Id</a></td>
+                    <td>@item.Symbol</td>
+                    <td>@item.TotalScore</td>
+                    <td>@item.BaseScore</td>
+                    <td>@item.PatternBonus</td>
+                    <td>@item.Status</td>
+                    <td><RegimeIndicator Regime="@item.Regime" /></td>
+                    <td>@item.SignalType</td>
+                    <td>@item.CreatedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private readonly SignalFilter filter = new();
+    private decimal? minScoreInput;
+    private string statusText = string.Empty;
+    private string regimeText = string.Empty;
+    private IReadOnlyList<SignalListItem> signals = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.IsAuthenticated)
+        {
+            await Load();
+        }
+    }
+
+    private async Task Load()
+    {
+        filter.MinScore = minScoreInput;
+        filter.Status = Enum.TryParse<SignalStatus>(statusText, out var status) ? status : null;
+        filter.Regime = Enum.TryParse<MarketRegime>(regimeText, out var regime) ? regime : null;
+        signals = await DataService.GetSignalsAsync(filter);
+    }
+}

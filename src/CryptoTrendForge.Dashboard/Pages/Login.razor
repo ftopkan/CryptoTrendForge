@@ -1,0 +1,38 @@
+@page "/login"
+@inject DashboardSession Session
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Options.IOptions<CryptoTrendForge.Dashboard.Configuration.DashboardAuthOptions> AuthOptions
+
+<h3>Dashboard Login</h3>
+
+<div style="max-width: 320px;">
+    <label>Username</label>
+    <input @bind="username" style="width: 100%;" />
+    <label style="margin-top: 10px;">Password</label>
+    <input type="password" @bind="password" style="width: 100%;" />
+    <button @onclick="SignIn" style="margin-top: 10px;">Sign In</button>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <p style="color: #b00020;">@error</p>
+}
+
+@code {
+    private string username = string.Empty;
+    private string password = string.Empty;
+    private string? error;
+
+    private void SignIn()
+    {
+        var options = AuthOptions.Value;
+        if (username == options.Username && password == options.Password)
+        {
+            Session.SignIn();
+            Navigation.NavigateTo("/signals");
+            return;
+        }
+
+        error = "Invalid credentials.";
+    }
+}

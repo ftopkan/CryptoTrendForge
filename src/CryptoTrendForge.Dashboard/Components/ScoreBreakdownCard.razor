@@ -1,0 +1,26 @@
+@if (Breakdown.Count == 0)
+{
+    <p>No score breakdown available.</p>
+}
+else
+{
+    <h4>Score Breakdown</h4>
+    <table style="width:100%; border-collapse: collapse; margin-bottom: 12px;">
+        <thead>
+            <tr><th style="text-align:left;">Factor</th><th style="text-align:left;">Value</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Breakdown.OrderBy(x => x.Key))
+            {
+                <tr style="border-top:1px solid #eee;">
+                    <td>@item.Key</td>
+                    <td>@item.Value</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter] public Dictionary<string, int> Breakdown { get; set; } = new();
+}
