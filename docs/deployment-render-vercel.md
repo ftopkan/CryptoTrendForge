@@ -18,6 +18,10 @@ Repo icine su dosyalar eklendi:
 
 ## Render Uzerinde Kurulum
 
+One-click link:
+
+https://dashboard.render.com/blueprint/new?repo=https://github.com/ftopkan/CryptoTrendForge
+
 1. Render'da **Blueprint** ile bu repoyu bagla (render.yaml otomatik okunur).
 2. Su environment variable'lari doldur:
 
@@ -49,6 +53,18 @@ Bu repo'nun mevcut mimarisi (Blazor Server + BackgroundService worker) Vercel'in
 - Blazor Server icin gereken stateful SignalR baglantisi Vercel'de stabil hedef degildir
 
 Bu nedenle production runtime olarak Render kullanilmali.
+
+## Vercel Import Linki
+
+Repo import:
+
+https://vercel.com/new/import?s=https://github.com/ftopkan/CryptoTrendForge
+
+Onerilen ayarlar:
+
+- Framework: Other
+- Build Command: `dotnet publish src/CryptoTrendForge.Dashboard/CryptoTrendForge.Dashboard.csproj -c Release -o .vercel/output`
+- Output Directory: `.vercel/output`
 
 ## Saglik Kontrolu
 

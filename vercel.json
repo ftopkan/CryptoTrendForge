@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "name": "cryptotrendforge-dashboard",
+  "buildCommand": "dotnet publish src/CryptoTrendForge.Dashboard/CryptoTrendForge.Dashboard.csproj -c Release -o .vercel/output",
+  "outputDirectory": ".vercel/output",
+  "framework": null,
+  "installCommand": "echo skip"
+}

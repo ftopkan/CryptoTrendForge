@@ -1,0 +1,6 @@
+**/bin/
+**/obj/
+tests/
+src/CryptoTrendForge.Worker/
+docs/
+render.yaml
