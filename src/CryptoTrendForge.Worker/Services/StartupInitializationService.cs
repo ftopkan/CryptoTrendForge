@@ -1,3 +1,4 @@
+using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Core.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,17 +22,22 @@ public sealed class StartupInitializationService : IHostedService
         using var scope = _serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        if (dbContext.Database.IsSqlServer())
-        {
-            _logger.LogInformation("Ensuring SQL Server schema exists...");
-            await dbContext.Database.EnsureCreatedAsync(cancellationToken);
-            _logger.LogInformation("SQL Server schema check completed.");
-            return;
-        }
-
-        _logger.LogInformation("Applying pending database migrations...");
+        var provider = dbContext.Database.IsSqlServer() ? "SQL Server" : "PostgreSQL";
+        _logger.LogInformation("Applying pending {Provider} database migrations...", provider);
         await dbContext.Database.MigrateAsync(cancellationToken);
-        _logger.LogInformation("Database migration check completed.");
+        _logger.LogInformation("{Provider} database migration check completed.", provider);
+
+        if (!await dbContext.Coins.AnyAsync(cancellationToken))
+        {
+            dbContext.Coins.Add(new Coin
+            {
+                Symbol = "XRPUSDT",
+                DisplayName = "XRP",
+                IsActive = true
+            });
+            await dbContext.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Seeded initial coin: XRPUSDT.");
+        }
     }
 
     public Task StopAsync(CancellationToken cancellationToken)

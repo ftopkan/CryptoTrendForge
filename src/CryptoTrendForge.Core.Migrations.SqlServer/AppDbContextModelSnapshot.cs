@@ -1,0 +1,216 @@
+using CryptoTrendForge.Core.Infrastructure.Database;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+#nullable disable
+
+namespace CryptoTrendForge.Core.Migrations.SqlServer;
+
+[DbContext(typeof(AppDbContext))]
+partial class AppDbContextModelSnapshot : ModelSnapshot
+{
+    protected override void BuildModel(ModelBuilder modelBuilder)
+    {
+#pragma warning disable 612, 618
+        modelBuilder
+            .HasAnnotation("ProductVersion", "8.0.10")
+            .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
+        SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+        modelBuilder.Entity("CryptoTrendForge.Core.Domain.Models.BotConfiguration", b =>
+        {
+            b.Property<string>("Key")
+                .HasMaxLength(100)
+                .HasColumnType("nvarchar(100)");
+
+            b.Property<DateTimeOffset>("UpdatedAt")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("datetimeoffset")
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            b.Property<string>("Value")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            b.HasKey("Key");
+            b.ToTable("bot_configuration");
+        });
+
+        modelBuilder.Entity("CryptoTrendForge.Core.Domain.Models.Coin", b =>
+        {
+            b.Property<int>("Id")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("int");
+
+            SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("datetimeoffset")
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            b.Property<string>("DisplayName")
+                .IsRequired()
+                .HasMaxLength(10)
+                .HasColumnType("nvarchar(10)");
+
+            b.Property<bool>("IsActive")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("bit")
+                .HasDefaultValue(true);
+
+            b.Property<string>("Symbol")
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasColumnType("nvarchar(20)");
+
+            b.HasKey("Id");
+            b.HasIndex("Symbol").IsUnique();
+            b.ToTable("coins");
+        });
+
+        modelBuilder.Entity("CryptoTrendForge.Core.Domain.Models.Signal", b =>
+        {
+            b.Property<int>("Id")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("int");
+
+            SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+            b.Property<string>("BtcTrend")
+                .HasMaxLength(10)
+                .HasColumnType("nvarchar(10)");
+
+            b.Property<int>("CoinId")
+                .HasColumnType("int");
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("datetimeoffset")
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            b.Property<DateTimeOffset?>("ExpiresAt")
+                .HasColumnType("datetimeoffset");
+
+            b.Property<decimal>("FundingRate")
+                .HasColumnType("numeric(10,6)");
+
+            b.Property<DateTimeOffset?>("InvalidatedAt")
+                .HasColumnType("datetimeoffset");
+
+            b.Property<string>("MarketRegime")
+                .IsRequired()
+                .HasMaxLength(10)
+                .HasColumnType("nvarchar(10)");
+
+            b.Property<string>("Pattern15M")
+                .HasMaxLength(50)
+                .HasColumnType("nvarchar(50)");
+
+            b.Property<string>("Pattern1H4H")
+                .HasMaxLength(50)
+                .HasColumnType("nvarchar(50)");
+
+            b.Property<int>("PatternBonus")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("int")
+                .HasDefaultValue(0);
+
+            b.Property<string>("RawSnapshot")
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<string>("Reasons")
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<string>("Risks")
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<decimal>("Score")
+                .HasColumnType("numeric(5,2)");
+
+            b.Property<string>("ScoreBreakdown")
+                .HasColumnType("nvarchar(max)");
+
+            b.Property<decimal>("SignalPrice")
+                .HasColumnType("numeric(18,8)");
+
+            b.Property<string>("SignalType")
+                .IsRequired()
+                .HasMaxLength(30)
+                .HasColumnType("nvarchar(30)");
+
+            b.Property<string>("Status")
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasColumnType("nvarchar(20)");
+
+            b.Property<decimal>("SupportDistPct")
+                .HasColumnType("numeric(5,2)");
+
+            b.Property<decimal>("SupportLevel")
+                .HasColumnType("numeric(18,8)");
+
+            b.Property<decimal>("TotalScore")
+                .HasColumnType("numeric(5,2)");
+
+            b.HasKey("Id");
+            b.HasIndex("CoinId");
+            b.ToTable("signals");
+        });
+
+        modelBuilder.Entity("CryptoTrendForge.Core.Domain.Models.SignalOutcome", b =>
+        {
+            b.Property<int>("Id")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("int");
+
+            SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+            b.Property<DateTimeOffset>("CreatedAt")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("datetimeoffset")
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            b.Property<int>("MinutesElapsed")
+                .HasColumnType("int");
+
+            b.Property<decimal>("PriceAt")
+                .HasColumnType("numeric(18,8)");
+
+            b.Property<decimal>("PriceChangePct")
+                .HasColumnType("numeric(8,2)");
+
+            b.Property<int>("SignalId")
+                .HasColumnType("int");
+
+            b.Property<DateTimeOffset>("SnapshotAt")
+                .HasColumnType("datetimeoffset");
+
+            b.HasKey("Id");
+            b.HasIndex("SignalId", "MinutesElapsed").IsUnique();
+            b.ToTable("signal_outcomes");
+        });
+
+        modelBuilder.Entity("CryptoTrendForge.Core.Domain.Models.Signal", b =>
+        {
+            b.HasOne("CryptoTrendForge.Core.Domain.Models.Coin", "Coin")
+                .WithMany()
+                .HasForeignKey("CoinId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
+
+        modelBuilder.Entity("CryptoTrendForge.Core.Domain.Models.SignalOutcome", b =>
+        {
+            b.HasOne("CryptoTrendForge.Core.Domain.Models.Signal", "Signal")
+                .WithMany()
+                .HasForeignKey("SignalId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
+#pragma warning restore 612, 618
+    }
+}

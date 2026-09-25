@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace CryptoTrendForge.Core.Infrastructure.Database.Migrations;
+namespace CryptoTrendForge.Core.Migrations.Postgres;
 
 [DbContext(typeof(AppDbContext))]
 partial class AppDbContextModelSnapshot : ModelSnapshot

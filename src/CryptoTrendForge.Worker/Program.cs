@@ -32,18 +32,7 @@ builder.Services.Configure<BybitClientOptions>(opt =>
 });
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-{
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-    var databaseProvider = builder.Configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>()?.Provider ?? "Postgres";
-    if (databaseProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
-    {
-        options.UseSqlServer(connectionString);
-    }
-    else
-    {
-        options.UseNpgsql(connectionString);
-    }
-});
+    DatabaseConfiguration.ConfigureAppDbContext(options, builder.Configuration));
 
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<MarketDataCache>();

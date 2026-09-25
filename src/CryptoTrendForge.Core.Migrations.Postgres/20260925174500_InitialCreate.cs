@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace CryptoTrendForge.Core.Infrastructure.Database.Migrations;
+namespace CryptoTrendForge.Core.Migrations.Postgres;
 
 public partial class InitialCreate : Migration
 {

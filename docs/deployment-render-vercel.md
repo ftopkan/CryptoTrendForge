@@ -46,6 +46,29 @@ Production'da MSSQL kullanmak icin iki deger zorunlu:
 
 Development'ta PostgreSQL kullanmaya devam edebilirsin (`Database:Provider=Postgres`).
 
+## Migration Projeleri
+
+- PostgreSQL: `src/CryptoTrendForge.Core.Migrations.Postgres`
+- SQL Server: `src/CryptoTrendForge.Core.Migrations.SqlServer`
+
+Startup'ta provider'a gore dogru migration assembly otomatik secilir ve `MigrateAsync()` calisir.
+
+Yeni migration olusturma:
+
+```bash
+# PostgreSQL
+dotnet ef migrations add <Name> \
+  --project src/CryptoTrendForge.Core.Migrations.Postgres/CryptoTrendForge.Core.Migrations.Postgres.csproj \
+  --startup-project src/CryptoTrendForge.Worker/CryptoTrendForge.Worker.csproj \
+  --context AppDbContext
+
+# SQL Server
+dotnet ef migrations add <Name> \
+  --project src/CryptoTrendForge.Core.Migrations.SqlServer/CryptoTrendForge.Core.Migrations.SqlServer.csproj \
+  --startup-project src/CryptoTrendForge.Worker/CryptoTrendForge.Worker.csproj \
+  --context AppDbContext
+```
+
 ### Dashboard
 
 - `DashboardAuth__Username`
@@ -80,7 +103,7 @@ Onerilen ayarlar:
 
 Deploy sonrasi asagidakileri kontrol et:
 
-1. `coins` tablosunda aktif coin var mi?
+1. `coins` tablosunda aktif coin var mi? (ilk deploy'da otomatik `XRPUSDT` eklenir)
 2. Worker logunda scan ve score satirlari geliyor mu?
 3. Telegram sinyali aliniyor mu?
 4. Dashboard `Signals` ve `Performance` sayfalari veri cekiyor mu?
