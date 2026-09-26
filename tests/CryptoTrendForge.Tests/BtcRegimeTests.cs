@@ -18,7 +18,7 @@ public sealed class BtcRegimeTests
         var snapshot = new BtcSnapshot
         {
             Klines4H = BuildTrendKlines(230, 100m, 1m),
-            Klines1H = BuildTrendKlines(80, 100m, 0.3m)
+            Klines1H = BuildOscillatingKlines(80)
         };
 
         var result = service.DetermineRegime(snapshot);
@@ -55,6 +55,46 @@ public sealed class BtcRegimeTests
         Assert.Equal(MarketRegime.RiskOff, result.Regime);
     }
 
+    private static IReadOnlyList<Kline> BuildOscillatingKlines(int count)
+    {
+        var list = new List<Kline>(count);
+        var price = 100m;
+        for (var i = 0; i < count; i++)
+        {
+            var change = (i % 2 == 0) ? 0.5m : -0.3m;
+            var close = price + change;
+            list.Add(new Kline
+            {
+                OpenTime = DateTimeOffset.UtcNow.AddHours(-count + i),
+                Open = price,
+                High = Math.Max(price, close) + 0.1m,
+                Low = Math.Min(price, close) - 0.1m,
+                Close = close,
+                Volume = 1000 + i
+            });
+            price = close;
+        }
+        return list;
+    }
+
+    private static IReadOnlyList<Kline> BuildFlatKlines(int count)
+    {
+        var list = new List<Kline>(count);
+        for (var i = 0; i < count; i++)
+        {
+            list.Add(new Kline
+            {
+                OpenTime = DateTimeOffset.UtcNow.AddHours(-count + i),
+                Open = 100m,
+                High = 101m,
+                Low = 99m,
+                Close = 100m,
+                Volume = 1000 + i
+            });
+        }
+        return list;
+    }
+
     private static IReadOnlyList<Kline> BuildTrendKlines(int count, decimal start, decimal step)
     {
         var list = new List<Kline>(count);
@@ -72,7 +112,6 @@ public sealed class BtcRegimeTests
             });
             price += step;
         }
-
         return list;
     }
 }

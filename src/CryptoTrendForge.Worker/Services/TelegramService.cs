@@ -111,7 +111,7 @@ public sealed class TelegramService
         var rsi1h = TryRsi(snapshot.Klines1H);
         var rsi15m = TryRsi(snapshot.Klines15M);
         var emaStructure = DescribeEmaStructure(snapshot.Klines4H);
-        var volumeChange = CalculateVolumeChangePct(snapshot.Klines15M);
+        var volumeChange = CalculateVolumeChangePct(snapshot.Klines1H);
         var regimeText = signal.MarketRegime switch
         {
             Core.Domain.Enums.MarketRegime.RiskOn => "Bitcoin yükselişi destekliyor",
@@ -148,7 +148,7 @@ public sealed class TelegramService
         sb.AppendLine($"RSI(14): 4 saat {FormatDecimal(rsi4h)} · 1 saat {FormatDecimal(rsi1h)} · 15 dk {FormatDecimal(rsi15m)}");
         sb.AppendLine($"4 saatlik ortalama sırası: {emaStructure}");
         sb.AppendLine($"Desteğe uzaklık: %{FormatDecimal(scoreResult.SupportDistancePct)} (seviye ${FormatPrice(scoreResult.SupportLevel)})");
-        sb.AppendLine($"Hacim değişimi: {volumeChange.ToString("+0.##;-0.##;0", Turkish)}%");
+        sb.AppendLine($"Hacim değişimi (1 saat): {volumeChange.ToString("+0.##;-0.##;0", Turkish)}%");
         sb.AppendLine($"Açık işlem değişimi (4 saat): {snapshot.OpenInterestChangePct4H.ToString("+0.##;-0.##;0", Turkish)}%");
         sb.AppendLine($"Fonlama oranı: {(snapshot.FundingRate * 100m).ToString("+0.####;-0.####;0", Turkish)}%");
         sb.AppendLine($"Mum yapısı (1 saat/4 saat): {scoreResult.PatternName ?? "Yok"}");

@@ -98,7 +98,7 @@ public sealed class SignalEngine
     {
         isBearAligned = false;
         reason = null;
-        if (snapshot.Klines4H.Count < 200 || snapshot.Klines1H.Count < 50)
+        if (snapshot.Klines4H.Count < 200)
         {
             return 0;
         }
@@ -107,54 +107,38 @@ public sealed class SignalEngine
         var ema4h50 = _technicalAnalysisService.CalculateEma(snapshot.Klines4H.Select(x => x.Close), 50)[^1];
         var ema4h200 = _technicalAnalysisService.CalculateEma(snapshot.Klines4H.Select(x => x.Close), 200)[^1];
 
-        var baseTrendScore = 0;
         if (ema4h20 > ema4h50 && ema4h50 > ema4h200)
         {
-            baseTrendScore = 25;
             reason = "4 saatlikte kısa ortalama, uzun ortalamanın üstünde.";
+            return 25;
         }
-        else if (ema4h20 > ema4h50 && ema4h50 < ema4h200)
+
+        if (ema4h20 > ema4h50 && ema4h50 < ema4h200)
         {
-            baseTrendScore = 12;
             reason = "4 saatlik ortalamalar henüz net bir yöne oturmamış.";
+            return 12;
         }
-        else if (ema4h20 < ema4h50 && ema4h50 > ema4h200)
+
+        if (ema4h20 < ema4h50 && ema4h50 < ema4h200)
         {
-            baseTrendScore = 0;
-        }
-        else if (ema4h20 < ema4h50 && ema4h50 < ema4h200)
-        {
-            baseTrendScore = 0;
             isBearAligned = true;
         }
 
-        var ema1h20 = _technicalAnalysisService.CalculateEma(snapshot.Klines1H.Select(x => x.Close), 20)[^1];
-        var ema1h50 = _technicalAnalysisService.CalculateEma(snapshot.Klines1H.Select(x => x.Close), 50)[^1];
-        if (ema1h20 > ema1h50 && baseTrendScore > 0)
-        {
-            baseTrendScore = Math.Min(25, baseTrendScore + 3);
-        }
-
-        return baseTrendScore;
+        return 0;
     }
 
     private int ScoreRsi(MarketSnapshot snapshot, List<string> reasons, List<string> risks)
     {
-        if (snapshot.Klines4H.Count < _botOptions.RsiPeriod * 2
-            || snapshot.Klines1H.Count < _botOptions.RsiPeriod * 2
-            || snapshot.Klines15M.Count < _botOptions.RsiPeriod * 2)
+        if (snapshot.Klines4H.Count < _botOptions.RsiPeriod * 2)
         {
             return 0;
         }
 
         var rsi4h = _technicalAnalysisService.CalculateRsi(snapshot.Klines4H, _botOptions.RsiPeriod);
-        var rsi1h = _technicalAnalysisService.CalculateRsi(snapshot.Klines1H, _botOptions.RsiPeriod);
-        var rsi15m = _technicalAnalysisService.CalculateRsi(snapshot.Klines15M, _botOptions.RsiPeriod);
 
-        var weighted = (ScoreRsiBucket(rsi4h) * 0.5m) + (ScoreRsiBucket(rsi1h) * 0.3m) + (ScoreRsiBucket(rsi15m) * 0.2m);
-        var score = (int)Math.Round(weighted, MidpointRounding.AwayFromZero);
+        var score = ScoreRsiBucket(rsi4h);
 
-        if (rsi4h <= 35m || rsi1h <= 35m)
+        if (rsi4h <= 35m)
         {
             reasons.Add("RSI düşük; satış baskısı azalmış, toparlanma ihtimali var.");
         }
@@ -169,13 +153,13 @@ public sealed class SignalEngine
 
     private int ScoreVolume(MarketSnapshot snapshot, List<string> reasons, List<string> risks)
     {
-        if (snapshot.Klines15M.Count < _botOptions.VolumeRecentCandles + _botOptions.VolumeBaselineCandles + _botOptions.VolumeRecentCandles)
+        if (snapshot.Klines1H.Count < _botOptions.VolumeRecentCandles + _botOptions.VolumeBaselineCandles + _botOptions.VolumeRecentCandles)
         {
             return 0;
         }
 
         var sentiment = _technicalAnalysisService.DetermineVolumeSentiment(
-            snapshot.Klines15M,
+            snapshot.Klines1H,
             _botOptions.VolumeRecentCandles,
             _botOptions.VolumeBaselineCandles);
 
@@ -212,8 +196,7 @@ public sealed class SignalEngine
         supportLevel = 0m;
 
         var swing4h = _technicalAnalysisService.FindSwingLows(snapshot.Klines4H, _botOptions.SwingLookbackCandles, _botOptions.SwingNeighborCount);
-        var swing1h = _technicalAnalysisService.FindSwingLows(snapshot.Klines1H, _botOptions.SwingLookbackCandles, _botOptions.SwingNeighborCount);
-        var supports = swing4h.Concat(swing1h)
+        var supports = swing4h
             .Where(x => x > 0m)
             .Distinct()
             .OrderByDescending(x => x)
@@ -261,7 +244,7 @@ public sealed class SignalEngine
             reasons.Add("Fiyat desteğe yakın.");
         }
 
-        if (HasBreakoutRetest(snapshot.Klines1H))
+        if (HasBreakoutRetest(snapshot.Klines4H))
         {
             score = Math.Min(20, score + 5);
             reasons.Add("Fiyat direnci kırıp geri test etmiş; bu seviye artık destek.");
@@ -272,13 +255,13 @@ public sealed class SignalEngine
 
     private int ScoreOpenInterest(MarketSnapshot snapshot, List<string> reasons, List<string> risks)
     {
-        if (snapshot.Klines1H.Count < 2)
+        if (snapshot.Klines4H.Count < 2)
         {
             return 0;
         }
 
-        var latest = snapshot.Klines1H[^1].Close;
-        var previous = snapshot.Klines1H[^2].Close;
+        var latest = snapshot.Klines4H[^1].Close;
+        var previous = snapshot.Klines4H[^2].Close;
         var priceUp = latest > previous;
         var priceDown = latest < previous;
         var oiUp = snapshot.OpenInterestChangePct4H > 0m;
@@ -320,16 +303,16 @@ public sealed class SignalEngine
         };
     }
 
-    private static bool HasBreakoutRetest(IReadOnlyList<Kline> klines1h)
+    private static bool HasBreakoutRetest(IReadOnlyList<Kline> klines4h)
     {
-        if (klines1h.Count < 20)
+        if (klines4h.Count < 15)
         {
             return false;
         }
 
-        var recent = klines1h.TakeLast(20).ToArray();
-        var resistance = recent.Take(15).Max(x => x.High);
-        var breakoutHappened = recent.Skip(15).Any(x => x.Close > resistance);
+        var recent = klines4h.TakeLast(15).ToArray();
+        var resistance = recent.Take(10).Max(x => x.High);
+        var breakoutHappened = recent.Skip(10).Any(x => x.Close > resistance);
         var latest = recent[^1];
         var retest = latest.Low <= resistance * 1.01m && latest.Close >= resistance;
         return breakoutHappened && retest;
@@ -337,13 +320,7 @@ public sealed class SignalEngine
 
     private string? DetectMainPattern(MarketSnapshot snapshot)
     {
-        var pattern4h = _technicalAnalysisService.DetectCandlestickPattern(snapshot.Klines4H);
-        if (!string.IsNullOrWhiteSpace(pattern4h))
-        {
-            return pattern4h;
-        }
-
-        return _technicalAnalysisService.DetectCandlestickPattern(snapshot.Klines1H);
+        return _technicalAnalysisService.DetectCandlestickPattern(snapshot.Klines4H);
     }
 
     private static void ApplyRegimeRiskNotes(MarketRegime regime, List<string> risks)
