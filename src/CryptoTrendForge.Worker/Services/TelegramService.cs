@@ -11,18 +11,15 @@ public sealed class TelegramService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly TelegramOptions _telegramOptions;
-    private readonly TechnicalAnalysisService _technicalAnalysisService;
     private readonly ILogger<TelegramService> _logger;
 
     public TelegramService(
         IHttpClientFactory httpClientFactory,
         IOptions<TelegramOptions> telegramOptions,
-        TechnicalAnalysisService technicalAnalysisService,
         ILogger<TelegramService> logger)
     {
         _httpClientFactory = httpClientFactory;
         _telegramOptions = telegramOptions.Value;
-        _technicalAnalysisService = technicalAnalysisService;
         _logger = logger;
     }
 
@@ -107,17 +104,7 @@ public sealed class TelegramService
             ? "🔥 GÜÇLÜ LONG ADAYI"
             : "🟢 LONG ADAYI";
 
-        var rsi4h = TryRsi(snapshot.Klines4H);
-        var rsi1h = TryRsi(snapshot.Klines1H);
-        var rsi15m = TryRsi(snapshot.Klines15M);
-        var emaStructure = DescribeEmaStructure(snapshot.Klines4H);
-        var volumeChange = CalculateVolumeChangePct(snapshot.Klines1H);
-        var regimeText = signal.MarketRegime switch
-        {
-            Core.Domain.Enums.MarketRegime.RiskOn => "Bitcoin yükselişi destekliyor",
-            Core.Domain.Enums.MarketRegime.RiskOff => "Bitcoin zayıf",
-            _ => "Bitcoin yönsüz"
-        };
+        var plan = BuildPositionPlan(snapshot.CurrentPrice, scoreResult.SupportLevel);
 
         sb.AppendLine(typeText);
         sb.AppendLine();
@@ -144,16 +131,7 @@ public sealed class TelegramService
         sb.AppendLine($"📌 Açık işlem: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("oi"))}/15");
         sb.AppendLine($"✨ Mum yapısı bonusu: {FormatPoints(scoreResult.PatternBonus)}/10");
         sb.AppendLine();
-        sb.AppendLine("🔎 Göstergeler");
-        sb.AppendLine($"RSI(14): 4 saat {FormatDecimal(rsi4h)} · 1 saat {FormatDecimal(rsi1h)} · 15 dk {FormatDecimal(rsi15m)}");
-        sb.AppendLine($"4 saatlik ortalama sırası: {emaStructure}");
-        sb.AppendLine($"Desteğe uzaklık: %{FormatDecimal(scoreResult.SupportDistancePct)} (seviye ${FormatPrice(scoreResult.SupportLevel)})");
-        sb.AppendLine($"Hacim değişimi (1 saat): {volumeChange.ToString("+0.##;-0.##;0", Turkish)}%");
-        sb.AppendLine($"Açık işlem değişimi (4 saat): {snapshot.OpenInterestChangePct4H.ToString("+0.##;-0.##;0", Turkish)}%");
-        sb.AppendLine($"Fonlama oranı: {(snapshot.FundingRate * 100m).ToString("+0.####;-0.####;0", Turkish)}%");
-        sb.AppendLine($"Mum yapısı (1 saat/4 saat): {scoreResult.PatternName ?? "Yok"}");
-        sb.AppendLine($"Mum yapısı (15 dk): {scoreResult.PatternName15m ?? "Yok"} (puana eklenmedi)");
-        sb.AppendLine($"Bitcoin durumu: {regimeText}");
+        AppendPositionPlan(sb, plan);
         sb.AppendLine();
         sb.AppendLine("✅ Gerekçeler");
         foreach (var reason in scoreResult.Reasons)
@@ -176,70 +154,81 @@ public sealed class TelegramService
         return sb.ToString();
     }
 
+    private readonly record struct PositionPlan(
+        decimal Entry,
+        string EntryNote,
+        decimal Stop,
+        decimal CautiousExit,
+        decimal BalancedExit,
+        decimal WideExit);
+
+    private static PositionPlan BuildPositionPlan(decimal currentPrice, decimal supportLevel)
+    {
+        var entry = currentPrice;
+        var entryNote = "güncel fiyat";
+
+        var supportBelowPrice = supportLevel > 0m && supportLevel < currentPrice;
+        if (supportBelowPrice)
+        {
+            var distancePct = ((currentPrice - supportLevel) / supportLevel) * 100m;
+            var pullback = supportLevel * 1.01m;
+            if (distancePct > 3m && pullback < currentPrice)
+            {
+                entry = pullback;
+                entryNote = "desteğe çekilince";
+            }
+        }
+
+        var stop = supportBelowPrice && supportLevel * 0.97m < entry
+            ? supportLevel * 0.97m
+            : entry * 0.97m;
+
+        var risk = entry - stop;
+        if (risk <= 0m)
+        {
+            stop = entry * 0.97m;
+            risk = entry - stop;
+        }
+
+        return new PositionPlan(
+            entry,
+            entryNote,
+            stop,
+            entry + risk,
+            entry + (risk * 2m),
+            entry + (risk * 3m));
+    }
+
+    private static void AppendPositionPlan(StringBuilder sb, PositionPlan plan)
+    {
+        sb.AppendLine("🎯 Pozisyon");
+        sb.AppendLine($"Giriş: ${FormatPrice(plan.Entry)} ({plan.EntryNote})");
+        sb.AppendLine($"Zarar kes: ${FormatPrice(plan.Stop)} ({FormatMovePct(plan.Entry, plan.Stop)})");
+        sb.AppendLine("Çıkışlar");
+        sb.AppendLine($"• Temkinli: ${FormatPrice(plan.CautiousExit)} ({FormatMovePct(plan.Entry, plan.CautiousExit)})");
+        sb.AppendLine($"• Dengeli: ${FormatPrice(plan.BalancedExit)} ({FormatMovePct(plan.Entry, plan.BalancedExit)})");
+        sb.AppendLine($"• Geniş: ${FormatPrice(plan.WideExit)} ({FormatMovePct(plan.Entry, plan.WideExit)})");
+    }
+
     private static string FormatPrice(decimal value)
     {
         return value.ToString("0.########", Turkish);
     }
 
-    private static string FormatDecimal(decimal value)
+    private static string FormatMovePct(decimal entry, decimal target)
     {
-        return value.ToString("0.##", Turkish);
+        if (entry <= 0m)
+        {
+            return "%0";
+        }
+
+        var pct = Math.Round(((target - entry) / entry) * 100m, 1);
+        var sign = pct > 0m ? "+" : pct < 0m ? "-" : string.Empty;
+        return sign + "%" + Math.Abs(pct).ToString("0.#", Turkish);
     }
 
     private static string FormatPoints(int value)
     {
         return value.ToString("+0;-0;0", Turkish);
-    }
-
-    private string DescribeEmaStructure(IReadOnlyList<Kline> klines4h)
-    {
-        if (klines4h.Count < 200)
-        {
-            return "Yetersiz veri";
-        }
-
-        var closes = klines4h.Select(x => x.Close);
-        var ema20 = _technicalAnalysisService.CalculateEma(closes, 20)[^1];
-        var ema50 = _technicalAnalysisService.CalculateEma(closes, 50)[^1];
-        var ema200 = _technicalAnalysisService.CalculateEma(closes, 200)[^1];
-
-        if (ema20 > ema50 && ema50 > ema200)
-        {
-            return "Kısa ortalama üstte, yön yukarı";
-        }
-
-        if (ema20 < ema50 && ema50 < ema200)
-        {
-            return "Kısa ortalama altta, yön aşağı";
-        }
-
-        return "Ortalamalar karışık";
-    }
-
-    private decimal TryRsi(IReadOnlyList<Kline> klines)
-    {
-        if (klines.Count < 28)
-        {
-            return 0m;
-        }
-
-        return _technicalAnalysisService.CalculateRsi(klines, 14);
-    }
-
-    private static decimal CalculateVolumeChangePct(IReadOnlyList<Kline> klines)
-    {
-        if (klines.Count < 13)
-        {
-            return 0m;
-        }
-
-        var recent = klines.TakeLast(3).Average(x => x.Volume);
-        var baseline = klines.Skip(klines.Count - 13).Take(10).Average(x => x.Volume);
-        if (baseline == 0m)
-        {
-            return 0m;
-        }
-
-        return Math.Round(((recent / baseline) - 1m) * 100m, 2);
     }
 }
