@@ -86,9 +86,27 @@ namespace CryptoTrendForge.Core.Migrations.SqlServer
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<decimal?>("BalancedExit")
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<int?>("BalancedMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("BalancedReachedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("BtcTrend")
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
+
+                    b.Property<decimal?>("CautiousExit")
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<int?>("CautiousMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CautiousReachedAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<int>("CoinId")
                         .HasColumnType("int");
@@ -97,6 +115,9 @@ namespace CryptoTrendForge.Core.Migrations.SqlServer
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetimeoffset")
                         .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<decimal?>("EntryPrice")
+                        .HasColumnType("numeric(18,8)");
 
                     b.Property<DateTimeOffset?>("ExpiresAt")
                         .HasColumnType("datetimeoffset");
@@ -153,14 +174,29 @@ namespace CryptoTrendForge.Core.Migrations.SqlServer
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<decimal?>("StopPrice")
+                        .HasColumnType("numeric(18,8)");
+
                     b.Property<decimal>("SupportDistPct")
                         .HasColumnType("numeric(5,2)");
 
                     b.Property<decimal>("SupportLevel")
                         .HasColumnType("numeric(18,8)");
 
+                    b.Property<DateTimeOffset?>("TargetsClosedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<decimal>("TotalScore")
                         .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal?>("WideExit")
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<int?>("WideMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("WideReachedAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.HasKey("Id");
 

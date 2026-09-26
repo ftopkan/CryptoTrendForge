@@ -15,6 +15,18 @@ public sealed class Signal
     public SignalStatus Status { get; set; }
     public MarketRegime MarketRegime { get; set; }
     public decimal SignalPrice { get; set; }
+    public decimal? EntryPrice { get; set; }
+    public decimal? StopPrice { get; set; }
+    public decimal? CautiousExit { get; set; }
+    public decimal? BalancedExit { get; set; }
+    public decimal? WideExit { get; set; }
+    public DateTimeOffset? CautiousReachedAt { get; set; }
+    public int? CautiousMinutes { get; set; }
+    public DateTimeOffset? BalancedReachedAt { get; set; }
+    public int? BalancedMinutes { get; set; }
+    public DateTimeOffset? WideReachedAt { get; set; }
+    public int? WideMinutes { get; set; }
+    public DateTimeOffset? TargetsClosedAt { get; set; }
     public decimal SupportLevel { get; set; }
     public decimal SupportDistPct { get; set; }
     public decimal FundingRate { get; set; }

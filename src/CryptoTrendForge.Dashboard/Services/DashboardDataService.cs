@@ -106,6 +106,15 @@ public sealed class DashboardDataService
             Regime = signal.MarketRegime,
             SignalType = signal.SignalType,
             SignalPrice = signal.SignalPrice,
+            EntryPrice = signal.EntryPrice,
+            StopPrice = signal.StopPrice,
+            CautiousExit = signal.CautiousExit,
+            CautiousMinutes = signal.CautiousMinutes,
+            BalancedExit = signal.BalancedExit,
+            BalancedMinutes = signal.BalancedMinutes,
+            WideExit = signal.WideExit,
+            WideMinutes = signal.WideMinutes,
+            TargetsClosedAt = signal.TargetsClosedAt,
             SupportLevel = signal.SupportLevel,
             SupportDistPct = signal.SupportDistPct,
             FundingRate = signal.FundingRate,
@@ -126,6 +135,48 @@ public sealed class DashboardDataService
                 })
                 .ToList()
         };
+    }
+
+    public async Task<IReadOnlyList<ExitTargetRow>> GetExitTargetsAsync(
+        DateTimeOffset? fromUtc,
+        DateTimeOffset? toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var query = db.Signals
+            .AsNoTracking()
+            .Where(x => x.EntryPrice != null);
+
+        if (fromUtc.HasValue)
+        {
+            query = query.Where(x => x.CreatedAt >= fromUtc.Value);
+        }
+
+        if (toUtc.HasValue)
+        {
+            query = query.Where(x => x.CreatedAt <= toUtc.Value);
+        }
+
+        return await query
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new ExitTargetRow
+            {
+                Id = x.Id,
+                Symbol = x.Coin != null ? x.Coin.Symbol : "?",
+                CreatedAt = x.CreatedAt,
+                EntryPrice = x.EntryPrice,
+                StopPrice = x.StopPrice,
+                CautiousExit = x.CautiousExit,
+                CautiousMinutes = x.CautiousMinutes,
+                BalancedExit = x.BalancedExit,
+                BalancedMinutes = x.BalancedMinutes,
+                WideExit = x.WideExit,
+                WideMinutes = x.WideMinutes,
+                TargetsClosedAt = x.TargetsClosedAt
+            })
+            .Take(500)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<PerformanceSnapshot> GetPerformanceAsync(CancellationToken cancellationToken = default)
@@ -176,8 +227,42 @@ public sealed class DashboardDataService
             CoinBuckets = byCoin,
             PatternWithSuccessRate = ComputeSuccessRate(withPattern),
             PatternWithoutSuccessRate = ComputeSuccessRate(withoutPattern),
-            RegimeBuckets = BuildRegimeBuckets(mapped)
+            RegimeBuckets = BuildRegimeBuckets(mapped),
+            ExitTargets = await BuildExitTargetSummaryAsync(db, cancellationToken)
         };
+    }
+
+    private static async Task<ExitTargetSummary> BuildExitTargetSummaryAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        var closed = await db.Signals
+            .AsNoTracking()
+            .Where(x => x.TargetsClosedAt != null && x.CautiousExit != null)
+            .Select(x => new
+            {
+                x.CautiousReachedAt,
+                x.BalancedReachedAt,
+                x.WideReachedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        var total = closed.Count;
+        return new ExitTargetSummary
+        {
+            ClosedSignals = total,
+            CautiousHitRatePct = HitRate(closed.Count(x => x.CautiousReachedAt != null), total),
+            BalancedHitRatePct = HitRate(closed.Count(x => x.BalancedReachedAt != null), total),
+            WideHitRatePct = HitRate(closed.Count(x => x.WideReachedAt != null), total)
+        };
+    }
+
+    private static decimal HitRate(int hits, int total)
+    {
+        if (total == 0)
+        {
+            return 0m;
+        }
+
+        return Math.Round((decimal)hits * 100m / total, 2);
     }
 
     private static decimal ComputeSuccessRate(IReadOnlyCollection<PerformancePoint> outcomes)
@@ -303,6 +388,15 @@ public sealed class SignalDetailView
     public MarketRegime Regime { get; set; }
     public SignalType SignalType { get; set; }
     public decimal SignalPrice { get; set; }
+    public decimal? EntryPrice { get; set; }
+    public decimal? StopPrice { get; set; }
+    public decimal? CautiousExit { get; set; }
+    public int? CautiousMinutes { get; set; }
+    public decimal? BalancedExit { get; set; }
+    public int? BalancedMinutes { get; set; }
+    public decimal? WideExit { get; set; }
+    public int? WideMinutes { get; set; }
+    public DateTimeOffset? TargetsClosedAt { get; set; }
     public decimal SupportLevel { get; set; }
     public decimal SupportDistPct { get; set; }
     public decimal FundingRate { get; set; }
@@ -334,6 +428,31 @@ public sealed class PerformanceSnapshot
     public decimal PatternWithoutSuccessRate { get; set; }
     public List<PerformanceBucket> CoinBuckets { get; set; } = [];
     public List<PerformanceBucket> RegimeBuckets { get; set; } = [];
+    public ExitTargetSummary ExitTargets { get; set; } = new();
+}
+
+public sealed class ExitTargetRow
+{
+    public int Id { get; set; }
+    public string Symbol { get; set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; set; }
+    public decimal? EntryPrice { get; set; }
+    public decimal? StopPrice { get; set; }
+    public decimal? CautiousExit { get; set; }
+    public int? CautiousMinutes { get; set; }
+    public decimal? BalancedExit { get; set; }
+    public int? BalancedMinutes { get; set; }
+    public decimal? WideExit { get; set; }
+    public int? WideMinutes { get; set; }
+    public DateTimeOffset? TargetsClosedAt { get; set; }
+}
+
+public sealed class ExitTargetSummary
+{
+    public int ClosedSignals { get; set; }
+    public decimal CautiousHitRatePct { get; set; }
+    public decimal BalancedHitRatePct { get; set; }
+    public decimal WideHitRatePct { get; set; }
 }
 
 public sealed class PerformanceBucket

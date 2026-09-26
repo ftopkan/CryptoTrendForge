@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Http.Json;
 using System.Text;
+using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Worker.Configuration;
 using Microsoft.Extensions.Options;
@@ -104,7 +105,7 @@ public sealed class TelegramService
             ? "🔥 GÜÇLÜ LONG ADAYI"
             : "🟢 LONG ADAYI";
 
-        var plan = BuildPositionPlan(snapshot.CurrentPrice, scoreResult.SupportLevel);
+        var plan = PositionPlan.Create(snapshot.CurrentPrice, scoreResult.SupportLevel);
 
         sb.AppendLine(typeText);
         sb.AppendLine();
@@ -152,51 +153,6 @@ public sealed class TelegramService
         sb.AppendLine();
         sb.AppendLine($"🆔 Sinyal no: {signal.Id}");
         return sb.ToString();
-    }
-
-    private readonly record struct PositionPlan(
-        decimal Entry,
-        string EntryNote,
-        decimal Stop,
-        decimal CautiousExit,
-        decimal BalancedExit,
-        decimal WideExit);
-
-    private static PositionPlan BuildPositionPlan(decimal currentPrice, decimal supportLevel)
-    {
-        var entry = currentPrice;
-        var entryNote = "güncel fiyat";
-
-        var supportBelowPrice = supportLevel > 0m && supportLevel < currentPrice;
-        if (supportBelowPrice)
-        {
-            var distancePct = ((currentPrice - supportLevel) / supportLevel) * 100m;
-            var pullback = supportLevel * 1.01m;
-            if (distancePct > 3m && pullback < currentPrice)
-            {
-                entry = pullback;
-                entryNote = "desteğe çekilince";
-            }
-        }
-
-        var stop = supportBelowPrice && supportLevel * 0.97m < entry
-            ? supportLevel * 0.97m
-            : entry * 0.97m;
-
-        var risk = entry - stop;
-        if (risk <= 0m)
-        {
-            stop = entry * 0.97m;
-            risk = entry - stop;
-        }
-
-        return new PositionPlan(
-            entry,
-            entryNote,
-            stop,
-            entry + risk,
-            entry + (risk * 2m),
-            entry + (risk * 3m));
     }
 
     private static void AppendPositionPlan(StringBuilder sb, PositionPlan plan)

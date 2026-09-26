@@ -50,6 +50,11 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(x => x.MarketRegime).HasConversion<string>().HasMaxLength(10);
             entity.Property(x => x.SignalPrice).HasColumnType("numeric(18,8)");
+            entity.Property(x => x.EntryPrice).HasColumnType("numeric(18,8)");
+            entity.Property(x => x.StopPrice).HasColumnType("numeric(18,8)");
+            entity.Property(x => x.CautiousExit).HasColumnType("numeric(18,8)");
+            entity.Property(x => x.BalancedExit).HasColumnType("numeric(18,8)");
+            entity.Property(x => x.WideExit).HasColumnType("numeric(18,8)");
             entity.Property(x => x.SupportLevel).HasColumnType("numeric(18,8)");
             entity.Property(x => x.SupportDistPct).HasColumnType("numeric(5,2)");
             entity.Property(x => x.FundingRate).HasColumnType("numeric(10,6)");

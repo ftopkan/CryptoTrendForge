@@ -19,6 +19,15 @@ else
     <p><b>Type:</b> @detail.SignalType | <b>Status:</b> @detail.Status | <b>Regime:</b> @detail.Regime</p>
     <p><b>Scores:</b> Base @detail.BaseScore / Pattern @detail.PatternBonus / Total @detail.TotalScore</p>
     <p><b>Support:</b> @detail.SupportLevel (distance %@detail.SupportDistPct)</p>
+    @if (detail.EntryPrice is not null)
+    {
+        <h4>Exit targets</h4>
+        <p><b>Entry:</b> @detail.EntryPrice</p>
+        <p><b>Stop:</b> @detail.StopPrice</p>
+        <p><b>Cautious:</b> @detail.CautiousExit — @DescribeTarget(detail.CautiousMinutes, detail.TargetsClosedAt)</p>
+        <p><b>Balanced:</b> @detail.BalancedExit — @DescribeTarget(detail.BalancedMinutes, detail.TargetsClosedAt)</p>
+        <p><b>Wide:</b> @detail.WideExit — @DescribeTarget(detail.WideMinutes, detail.TargetsClosedAt)</p>
+    }
     <p><b>Funding:</b> @detail.FundingRate</p>
     <p><b>Pattern (1H/4H):</b> @(detail.PatternMain ?? "None")</p>
     <p><b>Pattern (15M):</b> @(detail.Pattern15m ?? "None")</p>
@@ -50,6 +59,16 @@ else
     [Parameter] public int SignalId { get; set; }
 
     private SignalDetailView? detail;
+
+    private static string DescribeTarget(int? minutes, DateTimeOffset? closedAt)
+    {
+        if (minutes is not null)
+        {
+            return $"reached in {minutes} min";
+        }
+
+        return closedAt is null ? "watching" : "not reached";
+    }
 
     protected override async Task OnParametersSetAsync()
     {

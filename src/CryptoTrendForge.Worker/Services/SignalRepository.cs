@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Core.Infrastructure.Database;
@@ -125,6 +126,13 @@ public sealed class SignalRepository
             ExpiresAt = expiresAt
         };
 
+        var plan = PositionPlan.Create(signalPrice, supportLevel);
+        signal.EntryPrice = plan.Entry;
+        signal.StopPrice = plan.Stop;
+        signal.CautiousExit = plan.CautiousExit;
+        signal.BalancedExit = plan.BalancedExit;
+        signal.WideExit = plan.WideExit;
+
         _dbContext.Signals.Add(signal);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return signal;
@@ -140,6 +148,26 @@ public sealed class SignalRepository
 
         signal.Status = SignalStatus.Active;
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Signal>> GetSignalsPendingExitEvaluationAsync(
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        var oldest = now.AddDays(-7);
+        return await _dbContext.Signals
+            .Include(x => x.Coin)
+            .Where(x => x.EntryPrice != null
+                && x.TargetsClosedAt == null
+                && x.ExpiresAt != null
+                && x.ExpiresAt >= oldest
+                && x.Coin != null)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<Signal>> GetActiveSignalsWithCoinAsync(CancellationToken cancellationToken = default)

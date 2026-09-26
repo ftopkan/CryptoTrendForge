@@ -1,3 +1,4 @@
+using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Worker.Configuration;
 using CryptoTrendForge.Worker.Infrastructure;
 using CryptoTrendForge.Worker.Services;
@@ -46,6 +47,7 @@ public sealed class SignalOutcomeWorker : BackgroundService
         try
         {
             await CaptureOutcomesAsync(stoppingToken);
+            await EvaluateExitTargetsAsync(stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -99,6 +101,38 @@ public sealed class SignalOutcomeWorker : BackgroundService
                     DateTimeOffset.UtcNow,
                     cancellationToken);
             }
+        }
+    }
+
+    private async Task EvaluateExitTargetsAsync(CancellationToken cancellationToken)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var signalRepository = scope.ServiceProvider.GetRequiredService<SignalRepository>();
+        var bybitService = scope.ServiceProvider.GetRequiredService<BybitService>();
+        var now = DateTimeOffset.UtcNow;
+        var pending = await signalRepository.GetSignalsPendingExitEvaluationAsync(now, cancellationToken);
+        var changed = false;
+
+        foreach (var signal in pending)
+        {
+            if (signal.Coin is null)
+            {
+                continue;
+            }
+
+            var klines = await bybitService.GetKlinesAsync(signal.Coin.Symbol, "15", 200, cancellationToken);
+            if (klines.Count == 0)
+            {
+                continue;
+            }
+
+            ExitTargetEvaluator.Apply(signal, klines, now);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            await signalRepository.SaveChangesAsync(cancellationToken);
         }
     }
 }
