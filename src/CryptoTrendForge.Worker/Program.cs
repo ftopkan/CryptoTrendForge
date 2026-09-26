@@ -2,11 +2,19 @@ using CryptoTrendForge.Core.Infrastructure.Database;
 using CryptoTrendForge.Core.Infrastructure.Http;
 using CryptoTrendForge.Core.Infrastructure.Cache;
 using CryptoTrendForge.Worker.Configuration;
+using CryptoTrendForge.Worker.Infrastructure;
 using CryptoTrendForge.Worker.Services;
 using CryptoTrendForge.Worker.Workers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Serilog;
+
+using var instanceLock = SingleInstanceLock.TryAcquire();
+if (instanceLock is null)
+{
+    Console.WriteLine("Another CryptoTrendForge Worker instance is already running. Exiting.");
+    return;
+}
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Configuration.AddJsonFile(
@@ -48,6 +56,7 @@ builder.Services.AddScoped<RiskFilterService>();
 builder.Services.AddScoped<SignalEngine>();
 builder.Services.AddScoped<SignalRepository>();
 builder.Services.AddScoped<TelegramService>();
+builder.Services.AddSingleton<RunOnceCoordinator>();
 builder.Services.AddHostedService<StartupInitializationService>();
 builder.Services.AddHostedService<SignalScanWorker>();
 builder.Services.AddHostedService<SignalOutcomeWorker>();

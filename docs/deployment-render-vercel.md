@@ -57,6 +57,26 @@ ConnectionStrings__DefaultConnection=Server=localhost;Database=trendforge_;User 
 
 Alternatif: sunucuda `appsettings.Production.local.json` dosyasina sadece password satirini ekle (gitignore'da).
 
+## Plesk Worker (RunOnce)
+
+Plesk'te Worker ortam degiskeni veya `appsettings.Production.local.json`:
+
+```
+BotSettings__RunOnce=true
+```
+
+Production Worker `RunOnce=true` ile calisir:
+
+- Her cron calistirmasinda 1 scan + 1 outcome dongusu yapar ve cikar
+- Wrapper script gerekmez
+- Ayni anda ikinci instance acilirsa lock dosyasi nedeniyle sessizce cikar
+
+Ornek Plesk Scheduled Task (her 5 dakika):
+
+```
+/usr/bin/dotnet /var/www/vhosts/.../trendforge-worker/CryptoTrendForge.Worker.dll
+```
+
 ## Migration Projeleri
 
 - PostgreSQL: `src/CryptoTrendForge.Core.Migrations.Postgres`

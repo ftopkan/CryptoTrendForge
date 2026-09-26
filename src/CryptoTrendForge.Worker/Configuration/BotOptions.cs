@@ -4,6 +4,12 @@ public sealed class BotOptions
 {
     public const string SectionName = "BotSettings";
 
+    /// <summary>
+    /// When true, each process runs one scan/outcome cycle and exits (for Plesk/cron).
+    /// When false, workers loop until the host is stopped (Render/Docker).
+    /// </summary>
+    public bool RunOnce { get; set; }
+
     public int ScanIntervalSeconds { get; set; } = 300;
     public int CooldownHours { get; set; } = 4;
     public bool AllowCooldownBypass { get; set; } = true;

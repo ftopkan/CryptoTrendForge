@@ -1,4 +1,7 @@
+using CryptoTrendForge.Worker.Configuration;
+using CryptoTrendForge.Worker.Infrastructure;
 using CryptoTrendForge.Worker.Services;
+using Microsoft.Extensions.Options;
 
 namespace CryptoTrendForge.Worker.Workers;
 
@@ -6,32 +9,51 @@ public sealed class SignalOutcomeWorker : BackgroundService
 {
     private static readonly int[] SnapshotMinutes = [15, 30, 60, 240];
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly BotOptions _botOptions;
+    private readonly RunOnceCoordinator _runOnceCoordinator;
     private readonly ILogger<SignalOutcomeWorker> _logger;
 
-    public SignalOutcomeWorker(IServiceScopeFactory scopeFactory, ILogger<SignalOutcomeWorker> logger)
+    public SignalOutcomeWorker(
+        IServiceScopeFactory scopeFactory,
+        IOptions<BotOptions> botOptions,
+        RunOnceCoordinator runOnceCoordinator,
+        ILogger<SignalOutcomeWorker> logger)
     {
         _scopeFactory = scopeFactory;
+        _botOptions = botOptions.Value;
+        _runOnceCoordinator = runOnceCoordinator;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (_botOptions.RunOnce)
+        {
+            await RunOutcomeIterationAsync(stoppingToken);
+            _runOnceCoordinator.NotifyWorkerCompleted(nameof(SignalOutcomeWorker));
+            return;
+        }
+
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
-            {
-                await CaptureOutcomesAsync(stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Signal outcome iteration failed.");
-            }
-
+            await RunOutcomeIterationAsync(stoppingToken);
             await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+        }
+    }
+
+    private async Task RunOutcomeIterationAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await CaptureOutcomesAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Expected during shutdown.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Signal outcome iteration failed.");
         }
     }
 

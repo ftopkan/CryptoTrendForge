@@ -2,6 +2,7 @@ using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Core.Infrastructure.Cache;
 using CryptoTrendForge.Worker.Configuration;
+using CryptoTrendForge.Worker.Infrastructure;
 using CryptoTrendForge.Worker.Services;
 using Microsoft.Extensions.Options;
 
@@ -12,38 +13,52 @@ public sealed class SignalScanWorker : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly BotOptions _botOptions;
     private readonly MarketDataCache _marketDataCache;
+    private readonly RunOnceCoordinator _runOnceCoordinator;
     private readonly ILogger<SignalScanWorker> _logger;
 
     public SignalScanWorker(
         IServiceScopeFactory scopeFactory,
         IOptions<BotOptions> botOptions,
         MarketDataCache marketDataCache,
+        RunOnceCoordinator runOnceCoordinator,
         ILogger<SignalScanWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _botOptions = botOptions.Value;
         _marketDataCache = marketDataCache;
+        _runOnceCoordinator = runOnceCoordinator;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (_botOptions.RunOnce)
+        {
+            await RunScanIterationAsync(stoppingToken);
+            _runOnceCoordinator.NotifyWorkerCompleted(nameof(SignalScanWorker));
+            return;
+        }
+
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
-            {
-                await ScanAsync(stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Signal scan iteration failed.");
-            }
-
+            await RunScanIterationAsync(stoppingToken);
             await Task.Delay(TimeSpan.FromSeconds(_botOptions.ScanIntervalSeconds), stoppingToken);
+        }
+    }
+
+    private async Task RunScanIterationAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await ScanAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Expected during shutdown.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Signal scan iteration failed.");
         }
     }
 
