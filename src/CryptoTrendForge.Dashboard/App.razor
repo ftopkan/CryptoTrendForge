@@ -1,16 +1,30 @@
 <Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
-        <nav class="layout-nav">
-            <a href="/signals">Signals</a>
-            <a href="/exits">Exits</a>
-            <a href="/performance">Performance</a>
-            <a href="/login">Login</a>
+        <nav class="navbar navbar-expand-md bg-body-tertiary border-bottom">
+            <div class="container-xl">
+                <a class="navbar-brand fw-semibold" href="/signals">CryptoTrendForge</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-label="Menu">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item"><NavLink class="nav-link" href="signals">Signals</NavLink></li>
+                        <li class="nav-item"><NavLink class="nav-link" href="exits">Exits</NavLink></li>
+                        <li class="nav-item"><NavLink class="nav-link" href="performance">Performance</NavLink></li>
+                    </ul>
+                    <ul class="navbar-nav">
+                        <li class="nav-item"><NavLink class="nav-link" href="login">Login</NavLink></li>
+                    </ul>
+                </div>
+            </div>
         </nav>
-        <main class="layout-content">
+        <main class="container-xl py-4">
             <RouteView RouteData="@routeData" />
         </main>
     </Found>
     <NotFound>
-        <h1>Sayfa bulunamadi</h1>
+        <main class="container py-5">
+            <h1 class="h3">Sayfa bulunamadi</h1>
+        </main>
     </NotFound>
 </Router>

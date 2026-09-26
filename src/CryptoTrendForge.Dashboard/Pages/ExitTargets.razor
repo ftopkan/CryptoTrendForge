@@ -2,67 +2,87 @@
 @inject DashboardDataService DataService
 @inject DashboardSession Session
 
-<h3>Exit Targets</h3>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Exit targets</h1>
+</div>
 
 @if (!Session.IsAuthenticated)
 {
-    <p>You must log in first.</p>
-    <a href="/login">Go to Login</a>
+    <div class="alert alert-secondary">You must log in first. <a href="/login">Go to login</a></div>
 }
 else
 {
-    <div class="filter-bar">
-        <label>
-            From
-            <input type="date" @bind="fromDate" @bind:format="yyyy-MM-dd" />
-        </label>
-        <label>
-            To
-            <input type="date" @bind="toDate" @bind:format="yyyy-MM-dd" />
-        </label>
-        <button @onclick="Load">Filter</button>
+    <div class="card border-secondary-subtle mb-3">
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">From</label>
+                    <input class="form-control" type="date" @bind="fromDate" @bind:format="yyyy-MM-dd" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To</label>
+                    <input class="form-control" type="date" @bind="toDate" @bind:format="yyyy-MM-dd" />
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary" @onclick="Load">Filter</button>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <p><b>Signals:</b> @rows.Count</p>
-    <p><b>Closed plans:</b> @closedCount</p>
-    <p><b>Cautious hit rate:</b> %@cautiousRate</p>
-    <p><b>Balanced hit rate:</b> %@balancedRate</p>
-    <p><b>Wide hit rate:</b> %@wideRate</p>
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3">
+            <div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Signals</div><div class="stat-value">@rows.Count</div></div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Closed plans</div><div class="stat-value">@closedCount</div></div></div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-secondary-subtle h-100">
+                <div class="card-body">
+                    <RateBar Label="Cautious" Percent="@cautiousRate" Value="@($"{cautiousRate}%")" />
+                    <RateBar Label="Balanced" Percent="@balancedRate" Value="@($"{balancedRate}%")" />
+                    <RateBar Label="Wide" Percent="@wideRate" Value="@($"{wideRate}%")" />
+                </div>
+            </div>
+        </div>
+    </div>
 
-    @if (rows.Count == 0)
-    {
-        <p>No signals with an exit plan in this date range.</p>
-    }
-    else
-    {
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Time (UTC)</th>
-                    <th>Symbol</th>
-                    <th>Entry</th>
-                    <th>Stop</th>
-                    <th>Cautious</th>
-                    <th>Balanced</th>
-                    <th>Wide</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var row in rows)
-                {
+    <div class="card border-secondary-subtle">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
                     <tr>
-                        <td>@row.CreatedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
-                        <td><a href="/signals/@row.Id">@row.Symbol</a></td>
-                        <td>@FormatPrice(row.EntryPrice)</td>
-                        <td>@FormatPrice(row.StopPrice)</td>
-                        <td>@FormatTarget(row.CautiousExit, row.CautiousMinutes, row.TargetsClosedAt)</td>
-                        <td>@FormatTarget(row.BalancedExit, row.BalancedMinutes, row.TargetsClosedAt)</td>
-                        <td>@FormatTarget(row.WideExit, row.WideMinutes, row.TargetsClosedAt)</td>
+                        <th>Time (UTC)</th>
+                        <th>Symbol</th>
+                        <th>Entry</th>
+                        <th>Stop</th>
+                        <th>Cautious</th>
+                        <th>Balanced</th>
+                        <th>Wide</th>
                     </tr>
-                }
-            </tbody>
-        </table>
-    }
+                </thead>
+                <tbody>
+                    @if (rows.Count == 0)
+                    {
+                        <tr><td colspan="7" class="text-secondary">No signals with an exit plan in this date range.</td></tr>
+                    }
+                    @foreach (var row in rows)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@row.CreatedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td><a class="fw-semibold" href="/signals/@row.Id">@row.Symbol</a></td>
+                            <td class="font-monospace">@FormatPrice(row.EntryPrice)</td>
+                            <td class="font-monospace">@FormatPrice(row.StopPrice)</td>
+                            <td><TargetCell Price="@row.CautiousExit" Minutes="@row.CautiousMinutes" ClosedAt="@row.TargetsClosedAt" /></td>
+                            <td><TargetCell Price="@row.BalancedExit" Minutes="@row.BalancedMinutes" ClosedAt="@row.TargetsClosedAt" /></td>
+                            <td><TargetCell Price="@row.WideExit" Minutes="@row.WideMinutes" ClosedAt="@row.TargetsClosedAt" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
 }
 
 @code {
@@ -121,16 +141,5 @@ else
     private static string FormatPrice(decimal? value)
     {
         return value?.ToString("0.########") ?? "—";
-    }
-
-    private static string FormatTarget(decimal? price, int? minutes, DateTimeOffset? closedAt)
-    {
-        var level = FormatPrice(price);
-        if (minutes is not null)
-        {
-            return $"{level} · {minutes} min";
-        }
-
-        return closedAt is null ? $"{level} · watching" : $"{level} · not reached";
     }
 }

@@ -2,73 +2,100 @@
 @inject DashboardDataService DataService
 @inject DashboardSession Session
 
-<h3>Signal Detail</h3>
-
 @if (!Session.IsAuthenticated)
 {
-    <p>You must log in first.</p>
-    <a href="/login">Go to Login</a>
+    <div class="alert alert-secondary">You must log in first. <a href="/login">Go to login</a></div>
 }
 else if (detail is null)
 {
-    <p>Signal not found.</p>
+    <div class="alert alert-warning">Signal not found.</div>
 }
 else
 {
-    <p><b>Signal:</b> #@detail.Id - @detail.Symbol</p>
-    <p><b>Type:</b> @detail.SignalType | <b>Status:</b> @detail.Status | <b>Regime:</b> @detail.Regime</p>
-    <p><b>Scores:</b> Base @detail.BaseScore / Pattern @detail.PatternBonus / Total @detail.TotalScore</p>
-    <p><b>Support:</b> @detail.SupportLevel (distance %@detail.SupportDistPct)</p>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">@detail.Symbol <span class="text-secondary">#@detail.Id</span></h1>
+        <a class="btn btn-outline-secondary btn-sm" href="/signals">Back</a>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-lg-4">
+            <div class="card border-secondary-subtle h-100">
+                <div class="card-header">Signal</div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between"><span>Type</span><span>@detail.SignalType</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Status</span><span class="badge text-bg-dark">@detail.Status</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Regime</span><RegimeIndicator Regime="@detail.Regime" /></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Total</span><span>@detail.TotalScore</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Base / pattern</span><span>@detail.BaseScore / @detail.PatternBonus</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Support</span><span class="font-monospace">@detail.SupportLevel</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Distance</span><span>@detail.SupportDistPct%</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Funding</span><span>@detail.FundingRate</span></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <ScoreBreakdownCard Breakdown="@detail.Breakdown" />
+        </div>
+    </div>
+
     @if (detail.EntryPrice is not null)
     {
-        <h4>Exit targets</h4>
-        <p><b>Entry:</b> @detail.EntryPrice</p>
-        <p><b>Stop:</b> @detail.StopPrice</p>
-        <p><b>Cautious:</b> @detail.CautiousExit — @DescribeTarget(detail.CautiousMinutes, detail.TargetsClosedAt)</p>
-        <p><b>Balanced:</b> @detail.BalancedExit — @DescribeTarget(detail.BalancedMinutes, detail.TargetsClosedAt)</p>
-        <p><b>Wide:</b> @detail.WideExit — @DescribeTarget(detail.WideMinutes, detail.TargetsClosedAt)</p>
+        <div class="card border-secondary-subtle mb-3">
+            <div class="card-header">Exit targets</div>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr><th>Level</th><th>Price</th><th>Result</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Entry</td><td class="font-monospace">@detail.EntryPrice</td><td></td></tr>
+                        <tr><td>Stop</td><td class="font-monospace">@detail.StopPrice</td><td></td></tr>
+                        <tr><td>Cautious</td><td colspan="2"><TargetCell Price="@detail.CautiousExit" Minutes="@detail.CautiousMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
+                        <tr><td>Balanced</td><td colspan="2"><TargetCell Price="@detail.BalancedExit" Minutes="@detail.BalancedMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
+                        <tr><td>Wide</td><td colspan="2"><TargetCell Price="@detail.WideExit" Minutes="@detail.WideMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     }
-    <p><b>Funding:</b> @detail.FundingRate</p>
-    <p><b>Pattern (1H/4H):</b> @(detail.PatternMain ?? "None")</p>
-    <p><b>Pattern (15M):</b> @(detail.Pattern15m ?? "None")</p>
 
-    <ScoreBreakdownCard Breakdown="@detail.Breakdown" />
-    <OutcomeChart Outcomes="@detail.Outcomes" />
+    <div class="mb-3">
+        <OutcomeChart Outcomes="@detail.Outcomes" />
+    </div>
 
-    <h4>Reasons</h4>
-    <ul>
-        @foreach (var reason in detail.Reasons)
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card border-secondary-subtle h-100">
+                <div class="card-header">Reasons</div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var reason in detail.Reasons)
+                    {
+                        <li class="list-group-item">@reason</li>
+                    }
+                </ul>
+            </div>
+        </div>
+        @if (detail.Risks.Count > 0)
         {
-            <li>@reason</li>
+            <div class="col-md-6">
+                <div class="card border-secondary-subtle h-100">
+                    <div class="card-header">Risks</div>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var risk in detail.Risks)
+                        {
+                            <li class="list-group-item">@risk</li>
+                        }
+                    </ul>
+                </div>
+            </div>
         }
-    </ul>
-
-    @if (detail.Risks.Count > 0)
-    {
-        <h4>Risks</h4>
-        <ul>
-            @foreach (var risk in detail.Risks)
-            {
-                <li>@risk</li>
-            }
-        </ul>
-    }
+    </div>
 }
 
 @code {
     [Parameter] public int SignalId { get; set; }
 
     private SignalDetailView? detail;
-
-    private static string DescribeTarget(int? minutes, DateTimeOffset? closedAt)
-    {
-        if (minutes is not null)
-        {
-            return $"reached in {minutes} min";
-        }
-
-        return closedAt is null ? "watching" : "not reached";
-    }
 
     protected override async Task OnParametersSetAsync()
     {

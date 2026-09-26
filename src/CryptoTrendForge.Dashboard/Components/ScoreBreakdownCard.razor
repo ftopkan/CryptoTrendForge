@@ -1,26 +1,34 @@
-@if (Breakdown.Count == 0)
-{
-    <p>No score breakdown available.</p>
-}
-else
-{
-    <h4>Score Breakdown</h4>
-    <table style="width:100%; border-collapse: collapse; margin-bottom: 12px;">
-        <thead>
-            <tr><th style="text-align:left;">Factor</th><th style="text-align:left;">Value</th></tr>
-        </thead>
-        <tbody>
+<div class="card border-secondary-subtle h-100">
+    <div class="card-header">Score breakdown</div>
+    <div class="card-body">
+        @if (Breakdown.Count == 0)
+        {
+            <p class="text-secondary mb-0">No score breakdown available.</p>
+        }
+        else
+        {
             @foreach (var item in Breakdown.OrderBy(x => x.Key))
             {
-                <tr style="border-top:1px solid #eee;">
-                    <td>@item.Key</td>
-                    <td>@item.Value</td>
-                </tr>
+                var max = MaxFor(item.Key);
+                var percent = max == 0 ? 0m : Math.Clamp(item.Value * 100m / max, -100m, 100m);
+                <RateBar Label="@item.Key" Percent="@percent" Negative="@(item.Value < 0)" Value="@($"{item.Value}/{max}")" />
             }
-        </tbody>
-    </table>
-}
+        }
+    </div>
+</div>
 
 @code {
     [Parameter] public Dictionary<string, int> Breakdown { get; set; } = new();
+
+    private static int MaxFor(string key)
+    {
+        return key switch
+        {
+            "trend" => 25,
+            "rsi" or "volume" or "support" => 20,
+            "oi" => 15,
+            "pattern_bonus" => 10,
+            _ => Math.Max(1, 25)
+        };
+    }
 }

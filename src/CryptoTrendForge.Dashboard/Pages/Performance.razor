@@ -2,55 +2,71 @@
 @inject DashboardDataService DataService
 @inject DashboardSession Session
 
-<h3>Performance</h3>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Performance</h1>
+</div>
 
 @if (!Session.IsAuthenticated)
 {
-    <p>You must log in first.</p>
-    <a href="/login">Go to Login</a>
+    <div class="alert alert-secondary">You must log in first. <a href="/login">Go to login</a></div>
 }
 else if (snapshot is null)
 {
-    <p>Loading...</p>
+    <p class="text-secondary">Loading...</p>
 }
 else
 {
-    <p><b>Signals (t+1h):</b> @snapshot.TotalSignalsAt1H</p>
-    <p><b>Overall Success Rate:</b> %@snapshot.OverallSuccessRatePct</p>
-    <p><b>Avg Change t+1h:</b> %@snapshot.AvgChange1HPct</p>
-    <p><b>Avg Change t+4h:</b> %@snapshot.AvgChange4HPct</p>
-    <p><b>Pattern Bonus Success:</b> %@snapshot.PatternWithSuccessRate</p>
-    <p><b>No Pattern Bonus Success:</b> %@snapshot.PatternWithoutSuccessRate</p>
-    <p><b>Closed exit plans:</b> @snapshot.ExitTargets.ClosedSignals</p>
-    <p><b>Cautious hit rate:</b> %@snapshot.ExitTargets.CautiousHitRatePct</p>
-    <p><b>Balanced hit rate:</b> %@snapshot.ExitTargets.BalancedHitRatePct</p>
-    <p><b>Wide hit rate:</b> %@snapshot.ExitTargets.WideHitRatePct</p>
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3"><div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Signals at 1h</div><div class="stat-value">@snapshot.TotalSignalsAt1H</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Success rate</div><div class="stat-value">@snapshot.OverallSuccessRatePct%</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Avg change 1h</div><div class="stat-value @(snapshot.AvgChange1HPct >= 0 ? "text-success" : "text-danger")">@snapshot.AvgChange1HPct.ToString("+0.##;-0.##;0")%</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Avg change 4h</div><div class="stat-value @(snapshot.AvgChange4HPct >= 0 ? "text-success" : "text-danger")">@snapshot.AvgChange4HPct.ToString("+0.##;-0.##;0")%</div></div></div></div>
+    </div>
 
-    <h4>By Coin</h4>
-    <table style="width:100%; border-collapse: collapse;">
-        <thead>
-            <tr><th style="text-align:left;">Coin</th><th style="text-align:left;">Signals</th><th style="text-align:left;">Success %</th></tr>
-        </thead>
-        <tbody>
-            @foreach (var b in snapshot.CoinBuckets)
-            {
-                <tr style="border-top:1px solid #eee;"><td>@b.Key</td><td>@b.Total</td><td>@b.SuccessRatePct</td></tr>
-            }
-        </tbody>
-    </table>
+    <div class="row g-3 mb-3">
+        <div class="col-lg-6">
+            <div class="card border-secondary-subtle h-100">
+                <div class="card-header">Exit target hit rate</div>
+                <div class="card-body">
+                    <p class="text-secondary small">Closed plans: @snapshot.ExitTargets.ClosedSignals</p>
+                    <RateBar Label="Cautious" Percent="@snapshot.ExitTargets.CautiousHitRatePct" Value="@($"{snapshot.ExitTargets.CautiousHitRatePct}%")" />
+                    <RateBar Label="Balanced" Percent="@snapshot.ExitTargets.BalancedHitRatePct" Value="@($"{snapshot.ExitTargets.BalancedHitRatePct}%")" />
+                    <RateBar Label="Wide" Percent="@snapshot.ExitTargets.WideHitRatePct" Value="@($"{snapshot.ExitTargets.WideHitRatePct}%")" />
+                    <RateBar Label="With pattern" Percent="@snapshot.PatternWithSuccessRate" Value="@($"{snapshot.PatternWithSuccessRate}%")" />
+                    <RateBar Label="No pattern" Percent="@snapshot.PatternWithoutSuccessRate" Value="@($"{snapshot.PatternWithoutSuccessRate}%")" />
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-secondary-subtle h-100">
+                <div class="card-header">By regime</div>
+                <div class="card-body">
+                    @if (snapshot.RegimeBuckets.Count == 0)
+                    {
+                        <p class="text-secondary mb-0">No closed 1h outcomes yet.</p>
+                    }
+                    @foreach (var bucket in snapshot.RegimeBuckets)
+                    {
+                        <RateBar Label="@bucket.Key" Percent="@bucket.SuccessRatePct" Value="@($"{bucket.SuccessRatePct}% · {bucket.Total}")" />
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <h4>By Regime</h4>
-    <table style="width:100%; border-collapse: collapse;">
-        <thead>
-            <tr><th style="text-align:left;">Regime</th><th style="text-align:left;">Signals</th><th style="text-align:left;">Success %</th></tr>
-        </thead>
-        <tbody>
-            @foreach (var b in snapshot.RegimeBuckets)
+    <div class="card border-secondary-subtle">
+        <div class="card-header">By coin</div>
+        <div class="card-body">
+            @if (snapshot.CoinBuckets.Count == 0)
             {
-                <tr style="border-top:1px solid #eee;"><td>@b.Key</td><td>@b.Total</td><td>@b.SuccessRatePct</td></tr>
+                <p class="text-secondary mb-0">No closed 1h outcomes yet.</p>
             }
-        </tbody>
-    </table>
+            @foreach (var bucket in snapshot.CoinBuckets)
+            {
+                <RateBar Label="@bucket.Key" Percent="@bucket.SuccessRatePct" Value="@($"{bucket.SuccessRatePct}% · {bucket.Total}")" />
+            }
+        </div>
+    </div>
 }
 
 @code {

@@ -1,33 +1,97 @@
-@if (Outcomes.Count == 0)
-{
-    <p>No outcomes captured yet.</p>
-}
-else
-{
-    <h4>Outcome Points</h4>
-    <table style="width:100%; border-collapse: collapse; margin-bottom: 12px;">
-        <thead>
-            <tr>
-                <th style="text-align:left;">Minutes</th>
-                <th style="text-align:left;">Price</th>
-                <th style="text-align:left;">Change %</th>
-                <th style="text-align:left;">Snapshot UTC</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var item in Outcomes)
-            {
-                <tr style="border-top:1px solid #eee;">
-                    <td>@item.MinutesElapsed</td>
-                    <td>@item.PriceAt</td>
-                    <td>@item.PriceChangePct</td>
-                    <td>@item.SnapshotAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+<div class="card border-secondary-subtle">
+    <div class="card-header">Price after the signal</div>
+    <div class="card-body">
+        @if (Outcomes.Count == 0)
+        {
+            <p class="text-secondary mb-0">No outcomes captured yet.</p>
+        }
+        else
+        {
+            <svg class="outcome-chart" viewBox="0 0 640 220" role="img" aria-label="Price change after the signal">
+                <line x1="36" y1="@ZeroY" x2="624" y2="@ZeroY" stroke="currentColor" stroke-opacity="0.25" />
+                <polyline fill="none" stroke="#38bdf8" stroke-width="2.5" points="@Points" />
+                @foreach (var point in Plot)
+                {
+                    <circle cx="@point.X" cy="@point.Y" r="4" fill="#38bdf8">
+                        <title>@point.Label · @point.Change</title>
+                    </circle>
+                }
+            </svg>
+            <div class="table-responsive mt-3">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Minutes</th>
+                            <th>Price</th>
+                            <th>Change</th>
+                            <th>Snapshot UTC</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Outcomes)
+                        {
+                            <tr>
+                                <td>@item.MinutesElapsed</td>
+                                <td class="font-monospace">@item.PriceAt.ToString("0.########")</td>
+                                <td class="@(item.PriceChangePct >= 0 ? "text-success" : "text-danger")">@item.PriceChangePct.ToString("+0.##;-0.##;0")%</td>
+                                <td>@item.SnapshotAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
 
 @code {
     [Parameter] public List<OutcomePoint> Outcomes { get; set; } = [];
+
+    private const double Width = 640;
+    private const double Height = 220;
+    private const double Left = 36;
+    private const double Right = 16;
+    private const double Top = 16;
+    private const double Bottom = 28;
+
+    private IReadOnlyList<PlotPoint> Plot => BuildPlot();
+    private string Points => string.Join(" ", Plot.Select(x => $"{x.X:0.##},{x.Y:0.##}"));
+    private double ZeroY => ToY(0m);
+
+    private double ToY(decimal value)
+    {
+        var min = Outcomes.Count == 0 ? 0m : Math.Min(0m, Outcomes.Min(x => x.PriceChangePct));
+        var max = Outcomes.Count == 0 ? 1m : Math.Max(0m, Outcomes.Max(x => x.PriceChangePct));
+        var span = max - min;
+        if (span == 0m)
+        {
+            span = 1m;
+        }
+
+        var ratio = (double)((value - min) / span);
+        return Top + ((1d - ratio) * (Height - Top - Bottom));
+    }
+
+    private List<PlotPoint> BuildPlot()
+    {
+        var result = new List<PlotPoint>();
+        if (Outcomes.Count == 0)
+        {
+            return result;
+        }
+
+        var innerWidth = Width - Left - Right;
+        for (var i = 0; i < Outcomes.Count; i++)
+        {
+            var item = Outcomes[i];
+            var x = Outcomes.Count == 1
+                ? Left + (innerWidth / 2d)
+                : Left + (i * innerWidth / (Outcomes.Count - 1));
+            result.Add(new PlotPoint(x, ToY(item.PriceChangePct), $"{item.MinutesElapsed}m", item.PriceChangePct.ToString("+0.##;-0.##;0") + "%"));
+        }
+
+        return result;
+    }
+
+    private sealed record PlotPoint(double X, double Y, string Label, string Change);
 }

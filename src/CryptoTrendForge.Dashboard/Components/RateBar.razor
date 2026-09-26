@@ -1,0 +1,17 @@
+<div class="d-flex align-items-center gap-3 mb-2">
+    <div class="text-truncate" style="width: 7.5rem;">@Label</div>
+    <div class="chart-track flex-grow-1">
+        <div class="chart-fill @BarClass" style="width: @Width%"></div>
+    </div>
+    <div class="text-end font-monospace small" style="width: 4.5rem;">@Value</div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public decimal Percent { get; set; }
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public bool Negative { get; set; }
+
+    private string BarClass => Negative ? "bg-danger" : "bg-info";
+    private decimal Width => Math.Clamp(Math.Abs(Percent), 0m, 100m);
+}
