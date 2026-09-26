@@ -33,7 +33,7 @@ public sealed class SignalEngine
 
         if (isBearAligned)
         {
-            risks.Add("4H EMA alignment remains bearish.");
+            risks.Add("4 saatlik ortalamalar düşüş sırasında.");
         }
 
         var rsiScore = ScoreRsi(snapshot, reasons, risks);
@@ -60,10 +60,10 @@ public sealed class SignalEngine
 
         if (patternBonus > 0)
         {
-            reasons.Add($"Pattern confirmation: {patternMain}.");
+            reasons.Add($"Mum yapısı: {patternMain}.");
             if (supportScore >= 13)
             {
-                reasons.Add($"Support zone + {patternMain} confirmation suggests stronger reversal context.");
+                reasons.Add($"Destekte bu mum yapısı var: {patternMain}. Dönüş ihtimali artıyor.");
             }
         }
 
@@ -111,12 +111,12 @@ public sealed class SignalEngine
         if (ema4h20 > ema4h50 && ema4h50 > ema4h200)
         {
             baseTrendScore = 25;
-            reason = "4H EMA structure shows full bullish alignment.";
+            reason = "4 saatlikte kısa ortalama, uzun ortalamanın üstünde.";
         }
         else if (ema4h20 > ema4h50 && ema4h50 < ema4h200)
         {
             baseTrendScore = 12;
-            reason = "4H EMA structure is in transition.";
+            reason = "4 saatlik ortalamalar henüz net bir yöne oturmamış.";
         }
         else if (ema4h20 < ema4h50 && ema4h50 > ema4h200)
         {
@@ -156,12 +156,12 @@ public sealed class SignalEngine
 
         if (rsi4h <= 35m || rsi1h <= 35m)
         {
-            reasons.Add("RSI profile indicates oversold recovery potential across higher timeframes.");
+            reasons.Add("RSI düşük; satış baskısı azalmış, toparlanma ihtimali var.");
         }
 
         if (rsi4h > 65m)
         {
-            risks.Add("4H RSI is elevated; upside continuation may be limited.");
+            risks.Add("4 saatlik RSI yüksek; yükseliş yorulmuş olabilir.");
         }
 
         return score;
@@ -191,11 +191,11 @@ public sealed class SignalEngine
 
         if (score >= 10)
         {
-            reasons.Add("Volume context supports buying-side participation.");
+            reasons.Add("Hacim alıcıların tarafında.");
         }
         else if (sentiment == VolumeSentiment.Distribution)
         {
-            risks.Add("Volume expands while price weakens (distribution risk).");
+            risks.Add("Fiyat düşerken hacim artıyor; satış baskısı güçlü.");
         }
 
         return score;
@@ -237,7 +237,7 @@ public sealed class SignalEngine
         if (snapshot.CurrentPrice < supportLevel)
         {
             score = -15;
-            risks.Add("Price is below computed support zone.");
+            risks.Add("Fiyat destek seviyesinin altında.");
         }
         else if (supportDistancePct <= 1.5m)
         {
@@ -258,13 +258,13 @@ public sealed class SignalEngine
 
         if (score >= 13)
         {
-            reasons.Add("Price is trading close to support zone.");
+            reasons.Add("Fiyat desteğe yakın.");
         }
 
         if (HasBreakoutRetest(snapshot.Klines1H))
         {
             score = Math.Min(20, score + 5);
-            reasons.Add("Recent breakout-retest structure adds support confirmation.");
+            reasons.Add("Fiyat direnci kırıp geri test etmiş; bu seviye artık destek.");
         }
 
         return score;
@@ -288,7 +288,7 @@ public sealed class SignalEngine
         if (priceUp && oiUp)
         {
             score = 15;
-            reasons.Add("Price rise with rising OI supports sustained participation.");
+            reasons.Add("Fiyat ve açık işlem sayısı birlikte artıyor; yeni alım var.");
         }
         else if (priceDown && oiDown)
         {
@@ -301,7 +301,7 @@ public sealed class SignalEngine
         else if (priceDown && oiUp)
         {
             score = -5;
-            risks.Add("Price weakness with rising OI can indicate short pressure.");
+            risks.Add("Fiyat düşerken açık işlem artıyor; satış baskısı gelebilir.");
         }
 
         return score;
@@ -350,11 +350,11 @@ public sealed class SignalEngine
     {
         if (regime == MarketRegime.RiskOff)
         {
-            risks.Add("BTC regime is RISK_OFF; thresholds become strict or signals blocked.");
+            risks.Add("Bitcoin zayıf; sinyal daha zor üretilir veya hiç üretilmez.");
         }
         else if (regime == MarketRegime.Neutral)
         {
-            risks.Add("BTC regime is NEUTRAL; confirmation quality should be higher.");
+            risks.Add("Bitcoin yönsüz; sinyalin daha net olması gerekir.");
         }
     }
 }

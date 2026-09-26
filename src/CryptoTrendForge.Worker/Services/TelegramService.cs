@@ -53,7 +53,7 @@ public sealed class TelegramService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError("Telegram send failed for signal {SignalId}. Status: {StatusCode}", signal.Id, response.StatusCode);
-                await SendAdminAlertAsync($"Signal notification failed for {snapshot.Symbol}. SignalId: {signal.Id}, Status: {response.StatusCode}", cancellationToken);
+                await SendAdminAlertAsync($"Sinyal bildirimi gönderilemedi. {snapshot.Symbol}, sinyal no: {signal.Id}, durum: {response.StatusCode}", cancellationToken);
                 return false;
             }
 
@@ -62,7 +62,7 @@ public sealed class TelegramService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Telegram send exception for signal {SignalId}", signal.Id);
-            await SendAdminAlertAsync($"Signal notification exception for {snapshot.Symbol}. SignalId: {signal.Id}. {ex.Message}", cancellationToken);
+            await SendAdminAlertAsync($"Sinyal bildiriminde hata oluştu. {snapshot.Symbol}, sinyal no: {signal.Id}. {ex.Message}", cancellationToken);
             return false;
         }
     }
@@ -83,7 +83,7 @@ public sealed class TelegramService
             var request = new
             {
                 chat_id = _telegramOptions.AdminChatId,
-                text = $"ADMIN ALERT\n{DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC\n{message}"
+                text = $"⚠️ Yönetici uyarısı\n{DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC\n{message}"
             };
 
             using var response = await client.PostAsJsonAsync(url, request, cancellationToken);
@@ -98,82 +98,104 @@ public sealed class TelegramService
         }
     }
 
+    private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
+
     private string BuildMessage(Signal signal, ScoreResult scoreResult, MarketSnapshot snapshot)
     {
         var sb = new StringBuilder();
         var typeText = signal.SignalType == Core.Domain.Enums.SignalType.StrongLongCandidate
-            ? "STRONG LONG CANDIDATE"
-            : "LONG CANDIDATE";
+            ? "🔥 GÜÇLÜ LONG ADAYI"
+            : "🟢 LONG ADAYI";
 
         var rsi4h = TryRsi(snapshot.Klines4H);
         var rsi1h = TryRsi(snapshot.Klines1H);
         var rsi15m = TryRsi(snapshot.Klines15M);
         var emaStructure = DescribeEmaStructure(snapshot.Klines4H);
         var volumeChange = CalculateVolumeChangePct(snapshot.Klines15M);
+        var regimeText = signal.MarketRegime switch
+        {
+            Core.Domain.Enums.MarketRegime.RiskOn => "Bitcoin yükselişi destekliyor",
+            Core.Domain.Enums.MarketRegime.RiskOff => "Bitcoin zayıf",
+            _ => "Bitcoin yönsüz"
+        };
 
         sb.AppendLine(typeText);
         sb.AppendLine();
-        sb.AppendLine($"{snapshot.Symbol} - ${snapshot.CurrentPrice.ToString("0.########", CultureInfo.InvariantCulture)}");
-        sb.AppendLine($"Time: {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+        sb.AppendLine($"💎 {snapshot.Symbol} · ${FormatPrice(snapshot.CurrentPrice)}");
+        sb.AppendLine($"🕒 {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
         sb.AppendLine();
-        sb.Append("Base Score: ")
-            .Append(scoreResult.BaseScore.ToString(CultureInfo.InvariantCulture))
+        sb.Append("📊 Temel skor: ")
+            .Append(scoreResult.BaseScore.ToString(Turkish))
             .Append("/100");
 
         if (scoreResult.PatternBonus > 0)
         {
             sb.Append(" +")
-                .Append(scoreResult.PatternBonus.ToString(CultureInfo.InvariantCulture))
-                .Append(" pattern bonus");
+                .Append(scoreResult.PatternBonus.ToString(Turkish))
+                .Append(" mum yapısı bonusu");
         }
 
         sb.AppendLine();
         sb.AppendLine();
-        sb.AppendLine("Factor Breakdown:");
-        sb.AppendLine($"Trend (EMA): +{scoreResult.Breakdown.GetValueOrDefault("trend")}/25");
-        sb.AppendLine($"RSI: +{scoreResult.Breakdown.GetValueOrDefault("rsi")}/20");
-        sb.AppendLine($"Volume: +{scoreResult.Breakdown.GetValueOrDefault("volume")}/20");
-        sb.AppendLine($"Support: +{scoreResult.Breakdown.GetValueOrDefault("support")}/20");
-        sb.AppendLine($"OI: +{scoreResult.Breakdown.GetValueOrDefault("oi")}/15");
-        sb.AppendLine($"Pattern Bonus: +{scoreResult.PatternBonus}/10");
+        sb.AppendLine($"📈 Trend (EMA): {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("trend"))}/25");
+        sb.AppendLine($"📉 RSI: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("rsi"))}/20");
+        sb.AppendLine($"🔊 Hacim: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("volume"))}/20");
+        sb.AppendLine($"🛡️ Destek: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("support"))}/20");
+        sb.AppendLine($"📌 Açık işlem: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("oi"))}/15");
+        sb.AppendLine($"✨ Mum yapısı bonusu: {FormatPoints(scoreResult.PatternBonus)}/10");
         sb.AppendLine();
-        sb.AppendLine("Indicators:");
-        sb.AppendLine($"RSI(14): 4H {rsi4h} | 1H {rsi1h} | 15M {rsi15m}");
-        sb.AppendLine($"EMA Structure (4H): {emaStructure}");
-        sb.AppendLine($"Support Distance: %{scoreResult.SupportDistancePct.ToString("0.##", CultureInfo.InvariantCulture)} (Level: ${scoreResult.SupportLevel.ToString("0.########", CultureInfo.InvariantCulture)})");
-        sb.AppendLine($"Volume Change: {volumeChange:+0.##;-0.##;0}%");
-        sb.AppendLine($"OI Change (4H): {snapshot.OpenInterestChangePct4H:+0.##;-0.##;0}%");
-        sb.AppendLine($"Funding Rate: {(snapshot.FundingRate * 100m).ToString("+0.####;-0.####;0", CultureInfo.InvariantCulture)}%");
-        sb.AppendLine($"Pattern (1H/4H): {scoreResult.PatternName ?? "None"}");
-        sb.AppendLine($"Pattern (15M): {scoreResult.PatternName15m ?? "None"} (not scored)");
-        sb.AppendLine($"BTC Regime: {signal.MarketRegime}");
+        sb.AppendLine("🔎 Göstergeler");
+        sb.AppendLine($"RSI(14): 4 saat {FormatDecimal(rsi4h)} · 1 saat {FormatDecimal(rsi1h)} · 15 dk {FormatDecimal(rsi15m)}");
+        sb.AppendLine($"4 saatlik ortalama sırası: {emaStructure}");
+        sb.AppendLine($"Desteğe uzaklık: %{FormatDecimal(scoreResult.SupportDistancePct)} (seviye ${FormatPrice(scoreResult.SupportLevel)})");
+        sb.AppendLine($"Hacim değişimi: {volumeChange.ToString("+0.##;-0.##;0", Turkish)}%");
+        sb.AppendLine($"Açık işlem değişimi (4 saat): {snapshot.OpenInterestChangePct4H.ToString("+0.##;-0.##;0", Turkish)}%");
+        sb.AppendLine($"Fonlama oranı: {(snapshot.FundingRate * 100m).ToString("+0.####;-0.####;0", Turkish)}%");
+        sb.AppendLine($"Mum yapısı (1 saat/4 saat): {scoreResult.PatternName ?? "Yok"}");
+        sb.AppendLine($"Mum yapısı (15 dk): {scoreResult.PatternName15m ?? "Yok"} (puana eklenmedi)");
+        sb.AppendLine($"Bitcoin durumu: {regimeText}");
         sb.AppendLine();
-        sb.AppendLine("Reasons:");
+        sb.AppendLine("✅ Gerekçeler");
         foreach (var reason in scoreResult.Reasons)
         {
-            sb.AppendLine($"- {reason}");
+            sb.AppendLine($"• {reason}");
         }
 
         if (scoreResult.Risks.Count > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("Risks:");
+            sb.AppendLine("⚠️ Riskler");
             foreach (var risk in scoreResult.Risks)
             {
-                sb.AppendLine($"- {risk}");
+                sb.AppendLine($"• {risk}");
             }
         }
 
         sb.AppendLine();
-        sb.AppendLine($"SignalId: {signal.Id}");
+        sb.AppendLine($"🆔 Sinyal no: {signal.Id}");
         return sb.ToString();
+    }
+
+    private static string FormatPrice(decimal value)
+    {
+        return value.ToString("0.########", Turkish);
+    }
+
+    private static string FormatDecimal(decimal value)
+    {
+        return value.ToString("0.##", Turkish);
+    }
+
+    private static string FormatPoints(int value)
+    {
+        return value.ToString("+0;-0;0", Turkish);
     }
 
     private string DescribeEmaStructure(IReadOnlyList<Kline> klines4h)
     {
         if (klines4h.Count < 200)
         {
-            return "Insufficient data";
+            return "Yetersiz veri";
         }
 
         var closes = klines4h.Select(x => x.Close);
@@ -183,15 +205,15 @@ public sealed class TelegramService
 
         if (ema20 > ema50 && ema50 > ema200)
         {
-            return "Bullish";
+            return "Kısa ortalama üstte, yön yukarı";
         }
 
         if (ema20 < ema50 && ema50 < ema200)
         {
-            return "Bearish";
+            return "Kısa ortalama altta, yön aşağı";
         }
 
-        return "Neutral";
+        return "Ortalamalar karışık";
     }
 
     private decimal TryRsi(IReadOnlyList<Kline> klines)

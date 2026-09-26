@@ -180,32 +180,32 @@ public sealed class TechnicalAnalysisService
 
         if (IsBullishEngulfing(b, c))
         {
-            return "Bullish Engulfing";
+            return "Düşüş mumunu kapatan yükseliş";
         }
 
         if (IsHammer(c))
         {
-            return "Hammer";
+            return "Dipten seken çekiç mum";
         }
 
         if (IsInvertedHammer(c))
         {
-            return "Inverted Hammer";
+            return "Uzun üst fitilli dip mumu";
         }
 
         if (IsMorningStar(a, b, c))
         {
-            return "Morning Star";
+            return "Üç mumluk dip dönüşü";
         }
 
         if (IsDragonflyDoji(c))
         {
-            return "Dragonfly Doji";
+            return "Uzun alt fitilli kararsız mum";
         }
 
         if (IsPiercingLine(b, c))
         {
-            return "Piercing Line";
+            return "Düşüşün yarısını geri alan yükseliş";
         }
 
         return null;
