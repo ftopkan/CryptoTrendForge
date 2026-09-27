@@ -34,8 +34,8 @@ public sealed class BotOptions
 
 public sealed class ScoreThresholdOptions
 {
-    public ThresholdLevel RiskOn { get; set; } = new() { Candidate = 70, Strong = 80 };
-    public ThresholdLevel Neutral { get; set; } = new() { Candidate = 75, Strong = 85 };
+    public ThresholdLevel RiskOn { get; set; } = new() { Candidate = 75, Strong = 85 };
+    public ThresholdLevel Neutral { get; set; } = new() { Candidate = 80, Strong = 90 };
 }
 
 public sealed class ThresholdLevel
