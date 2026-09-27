@@ -90,6 +90,8 @@ public sealed class SignalScanWorker : BackgroundService
         }
 
         var coins = await marketDataService.GetActiveCoinsAsync(cancellationToken);
+        var bestScore = 0;
+        string? bestSymbol = null;
         foreach (var coin in coins)
         {
             var snapshot = await marketDataService.GetMarketSnapshotAsync(coin.Symbol, cancellationToken);
@@ -115,6 +117,11 @@ public sealed class SignalScanWorker : BackgroundService
 
             var scoreResult = signalEngine.CalculateScore(snapshot, regimeResult.Regime);
             var (candidateThreshold, strongThreshold) = ResolveThresholds(regimeResult.Regime);
+            if (scoreResult.TotalScore > bestScore)
+            {
+                bestScore = scoreResult.TotalScore;
+                bestSymbol = coin.Symbol;
+            }
 
             if (scoreResult.TotalScore < candidateThreshold)
             {
@@ -196,6 +203,13 @@ public sealed class SignalScanWorker : BackgroundService
                     scoreResult.TotalScore);
             }
         }
+
+        _logger.LogInformation(
+            "Scan finished. Regime {Regime}. Best score {BestScore} on {BestSymbol}. Candidate threshold {Threshold}.",
+            regimeResult.Regime,
+            bestScore,
+            bestSymbol ?? "-",
+            ResolveThresholds(regimeResult.Regime).Candidate);
     }
 
     private async Task<Signal?> ResolveActiveSignalAsync(
