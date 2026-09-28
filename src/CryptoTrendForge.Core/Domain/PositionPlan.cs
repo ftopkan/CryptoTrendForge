@@ -2,6 +2,10 @@ namespace CryptoTrendForge.Core.Domain;
 
 public sealed class PositionPlan
 {
+    private const decimal CautiousRewardMultiple = 0.5m;
+    private const decimal BalancedRewardMultiple = 1m;
+    private const decimal WideRewardMultiple = 1.5m;
+
     public decimal Entry { get; init; }
     public string EntryNote { get; init; } = string.Empty;
     public decimal Stop { get; init; }
@@ -42,9 +46,9 @@ public sealed class PositionPlan
             Entry = entry,
             EntryNote = entryNote,
             Stop = stop,
-            CautiousExit = entry + risk,
-            BalancedExit = entry + (risk * 2m),
-            WideExit = entry + (risk * 3m)
+            CautiousExit = entry + (risk * CautiousRewardMultiple),
+            BalancedExit = entry + (risk * BalancedRewardMultiple),
+            WideExit = entry + (risk * WideRewardMultiple)
         };
     }
 }

@@ -15,9 +15,10 @@ public sealed class ExitTargetEvaluatorTests
 
         Assert.Equal(100m, plan.Entry);
         Assert.Equal("güncel fiyat", plan.EntryNote);
-        Assert.True(plan.CautiousExit > plan.Entry);
-        Assert.True(plan.BalancedExit > plan.CautiousExit);
-        Assert.True(plan.WideExit > plan.BalancedExit);
+        var risk = plan.Entry - plan.Stop;
+        Assert.Equal(plan.Entry + (risk * 0.5m), plan.CautiousExit);
+        Assert.Equal(plan.Entry + risk, plan.BalancedExit);
+        Assert.Equal(plan.Entry + (risk * 1.5m), plan.WideExit);
     }
 
     [Fact]
