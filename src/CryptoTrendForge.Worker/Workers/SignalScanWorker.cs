@@ -103,12 +103,6 @@ public sealed class SignalScanWorker : BackgroundService
             await signalRepository.InvalidateIfBrokenSupportAsync(coin.Id, snapshot.CurrentPrice, cancellationToken);
 
             var filterResult = riskFilterService.Check(snapshot, btcSnapshot, regimeResult);
-            if (filterResult.IsBlocked)
-            {
-                _logger.LogDebug("Signal blocked for {Symbol}: {Reason}", coin.Symbol, filterResult.Reason);
-                continue;
-            }
-
             if (_botOptions.BtcRiskOffBlockEnabled && regimeResult.Regime == MarketRegime.RiskOff)
             {
                 _logger.LogDebug("Risk-off blocking enabled, skipping signal generation for {Symbol}.", coin.Symbol);
@@ -117,6 +111,19 @@ public sealed class SignalScanWorker : BackgroundService
 
             var scoreResult = signalEngine.CalculateScore(snapshot, regimeResult.Regime);
             var (candidateThreshold, strongThreshold) = ResolveThresholds(regimeResult.Regime);
+            await signalRepository.RecordNearMissIfNeededAsync(
+                coin,
+                scoreResult,
+                candidateThreshold,
+                filterResult.IsBlocked,
+                filterResult.Reason,
+                now,
+                cancellationToken);
+            if (filterResult.IsBlocked)
+            {
+                _logger.LogDebug("Signal blocked for {Symbol}: {Reason}", coin.Symbol, filterResult.Reason);
+                continue;
+            }
             if (scoreResult.TotalScore > bestScore)
             {
                 bestScore = scoreResult.TotalScore;

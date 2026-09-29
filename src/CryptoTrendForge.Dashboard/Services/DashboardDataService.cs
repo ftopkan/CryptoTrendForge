@@ -115,6 +115,7 @@ public sealed class DashboardDataService
             SignalPrice = signal.SignalPrice,
             EntryPrice = signal.EntryPrice,
             StopPrice = signal.StopPrice,
+            StopMinutes = signal.StopMinutes,
             CautiousExit = signal.CautiousExit,
             CautiousMinutes = signal.CautiousMinutes,
             BalancedExit = signal.BalancedExit,
@@ -175,6 +176,7 @@ public sealed class DashboardDataService
                 CreatedAt = x.CreatedAt,
                 EntryPrice = x.EntryPrice,
                 StopPrice = x.StopPrice,
+                StopMinutes = x.StopMinutes,
                 CautiousExit = x.CautiousExit,
                 CautiousMinutes = x.CautiousMinutes,
                 BalancedExit = x.BalancedExit,
@@ -413,6 +415,7 @@ public sealed class SignalDetailView
     public decimal SignalPrice { get; set; }
     public decimal? EntryPrice { get; set; }
     public decimal? StopPrice { get; set; }
+    public int? StopMinutes { get; set; }
     public decimal? CautiousExit { get; set; }
     public int? CautiousMinutes { get; set; }
     public decimal? BalancedExit { get; set; }
@@ -464,6 +467,7 @@ public sealed class ExitTargetRow
     public DateTimeOffset CreatedAt { get; set; }
     public decimal? EntryPrice { get; set; }
     public decimal? StopPrice { get; set; }
+    public int? StopMinutes { get; set; }
     public decimal? CautiousExit { get; set; }
     public int? CautiousMinutes { get; set; }
     public decimal? BalancedExit { get; set; }

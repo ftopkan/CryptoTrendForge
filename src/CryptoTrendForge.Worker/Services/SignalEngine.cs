@@ -24,7 +24,7 @@ public sealed class SignalEngine
         var reasons = new List<string>();
         var risks = new List<string>();
 
-        var trendScore = ScoreTrend(snapshot, out var isBearAligned, out var trendReason);
+        var trendScore = ScoreTrend(snapshot, out var isBearAligned, out var trendReason, out var ema20ExtensionPct);
         breakdown["trend"] = trendScore;
         if (!string.IsNullOrWhiteSpace(trendReason))
         {
@@ -36,7 +36,7 @@ public sealed class SignalEngine
             risks.Add("4 saatlik ortalamalar düşüş sırasında.");
         }
 
-        var rsiScore = ScoreRsi(snapshot, reasons, risks);
+        var rsiScore = ScoreRsi(snapshot, reasons, risks, out var rsi4h);
         breakdown["rsi"] = rsiScore;
 
         var volumeScore = ScoreVolume(snapshot, reasons, risks);
@@ -78,6 +78,8 @@ public sealed class SignalEngine
             SupportDistancePct = Math.Round(supportDistancePct, 2),
             PatternName = patternMain,
             PatternName15m = pattern15m,
+            Rsi4H = rsi4h,
+            Ema20ExtensionPct = ema20ExtensionPct,
             Breakdown = breakdown,
             Reasons = reasons,
             Risks = risks,
@@ -89,54 +91,33 @@ public sealed class SignalEngine
                 snapshot.OpenInterestChangePct1H,
                 snapshot.OpenInterestChangePct4H,
                 supportLevel,
-                supportDistancePct
+                supportDistancePct,
+                rsi4h,
+                ema20ExtensionPct
             }
         };
     }
 
-    private int ScoreTrend(MarketSnapshot snapshot, out bool isBearAligned, out string? reason)
+    private int ScoreTrend(MarketSnapshot snapshot, out bool isBearAligned, out string? reason, out decimal? ema20ExtensionPct)
     {
-        isBearAligned = false;
-        reason = null;
-        if (snapshot.Klines4H.Count < 200)
-        {
-            return 0;
-        }
-
-        var ema4h20 = _technicalAnalysisService.CalculateEma(snapshot.Klines4H.Select(x => x.Close), 20)[^1];
-        var ema4h50 = _technicalAnalysisService.CalculateEma(snapshot.Klines4H.Select(x => x.Close), 50)[^1];
-        var ema4h200 = _technicalAnalysisService.CalculateEma(snapshot.Klines4H.Select(x => x.Close), 200)[^1];
-
-        if (ema4h20 > ema4h50 && ema4h50 > ema4h200)
-        {
-            reason = "4 saatlikte kısa ortalama, uzun ortalamanın üstünde.";
-            return 25;
-        }
-
-        if (ema4h20 > ema4h50 && ema4h50 < ema4h200)
-        {
-            reason = "4 saatlik ortalamalar henüz net bir yöne oturmamış.";
-            return 12;
-        }
-
-        if (ema4h20 < ema4h50 && ema4h50 < ema4h200)
-        {
-            isBearAligned = true;
-        }
-
-        return 0;
+        var trend = _technicalAnalysisService.EvaluateTrend(snapshot.Klines4H.Select(x => x.Close).ToArray());
+        isBearAligned = trend.IsBearAligned;
+        reason = trend.Reason;
+        ema20ExtensionPct = trend.Ema20ExtensionPct;
+        return trend.Score;
     }
 
-    private int ScoreRsi(MarketSnapshot snapshot, List<string> reasons, List<string> risks)
+    private int ScoreRsi(MarketSnapshot snapshot, List<string> reasons, List<string> risks, out decimal? rsi4h)
     {
+        rsi4h = null;
         if (snapshot.Klines4H.Count < _botOptions.RsiPeriod * 2)
         {
             return 0;
         }
 
-        var rsi4h = _technicalAnalysisService.CalculateRsi(snapshot.Klines4H, _botOptions.RsiPeriod);
+        rsi4h = _technicalAnalysisService.CalculateRsi(snapshot.Klines4H, _botOptions.RsiPeriod);
 
-        var score = ScoreRsiBucket(rsi4h);
+        var score = ScoreRsiBucket(rsi4h.Value);
 
         if (rsi4h <= 35m)
         {

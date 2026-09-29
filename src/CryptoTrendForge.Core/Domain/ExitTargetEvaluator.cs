@@ -4,7 +4,7 @@ namespace CryptoTrendForge.Core.Domain;
 
 public static class ExitTargetEvaluator
 {
-    public static void Apply(Signal signal, IReadOnlyList<Kline> klines, DateTimeOffset now)
+    public static void Apply(Signal signal, IReadOnlyList<Kline> klines, DateTimeOffset now, DateTimeOffset? countUntil = null)
     {
         if (signal.TargetsClosedAt is not null
             || signal.EntryPrice is null
@@ -20,6 +20,10 @@ public static class ExitTargetEvaluator
 
         var windowStart = signal.CreatedAt;
         var windowEnd = signal.ExpiresAt.Value;
+        if (countUntil is DateTimeOffset until && until < windowEnd)
+        {
+            windowEnd = until;
+        }
         var entry = signal.EntryPrice.Value;
         var filled = entry >= signal.SignalPrice;
 
@@ -44,6 +48,12 @@ public static class ExitTargetEvaluator
             if (minutes < 0)
             {
                 continue;
+            }
+
+            if (signal.StopPrice is decimal stop && signal.StopReachedAt is null && candle.Low <= stop)
+            {
+                signal.StopReachedAt = candle.OpenTime;
+                signal.StopMinutes = minutes;
             }
 
             MarkIfTouched(candle.High, signal.CautiousExit.Value, candle.OpenTime, minutes, signal.CautiousReachedAt, value =>

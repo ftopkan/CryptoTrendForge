@@ -17,21 +17,37 @@ public sealed class BybitService
         _logger = logger;
     }
 
+    public Task<IReadOnlyList<Kline>> GetKlinesAsync(
+        string symbol,
+        string interval,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        return GetKlinesAsync(symbol, interval, limit, null, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Kline>> GetKlinesAsync(
         string symbol,
         string interval,
-        int limit = 200,
-        CancellationToken cancellationToken = default)
+        int limit,
+        long? endTimeMs,
+        CancellationToken cancellationToken)
     {
+        var query = new Dictionary<string, string?>
+        {
+            ["category"] = CategoryLinear,
+            ["symbol"] = symbol,
+            ["interval"] = interval,
+            ["limit"] = limit.ToString(CultureInfo.InvariantCulture)
+        };
+        if (endTimeMs is long end)
+        {
+            query["end"] = end.ToString(CultureInfo.InvariantCulture);
+        }
+
         var payload = await _httpClient.GetJsonAsync(
             "/v5/market/kline",
-            new Dictionary<string, string?>
-            {
-                ["category"] = CategoryLinear,
-                ["symbol"] = symbol,
-                ["interval"] = interval,
-                ["limit"] = limit.ToString(CultureInfo.InvariantCulture)
-            },
+            query,
             cancellationToken);
 
         if (payload is null)
@@ -107,20 +123,7 @@ public sealed class BybitService
             .Where(v => v > 0m)
             .ToArray();
 
-        if (values.Length < 2)
-        {
-            return 0m;
-        }
-
-        var oldest = values[^1];
-        var latest = values[0];
-
-        if (oldest == 0m)
-        {
-            return 0m;
-        }
-
-        return Math.Round(((latest - oldest) / oldest) * 100m, 2);
+        return OpenInterestChange.PercentFromNewestFirst(values);
     }
 
     public async Task<decimal> GetFundingRateAsync(

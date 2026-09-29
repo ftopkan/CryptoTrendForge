@@ -95,6 +95,56 @@ public sealed class ExitTargetEvaluatorTests
         Assert.Equal(30, signal.CautiousMinutes);
     }
 
+    [Fact]
+    public void Apply_RecordsStopWhenTheFilledCandleTradesThroughIt()
+    {
+        var signal = NewSignal();
+        var klines = new[]
+        {
+            Candle(CreatedAt.AddMinutes(15), high: 101m, low: 99m),
+            Candle(CreatedAt.AddMinutes(45), high: 100m, low: 90m)
+        };
+
+        ExitTargetEvaluator.Apply(signal, klines, CreatedAt.AddHours(1));
+
+        Assert.Equal(45, signal.StopMinutes);
+        Assert.Null(signal.TargetsClosedAt);
+    }
+
+    [Fact]
+    public void Apply_DoesNotRecordStopBeforeThePullbackEntryFills()
+    {
+        var signal = NewSignal();
+        signal.SignalPrice = 110m;
+        signal.EntryPrice = 100m;
+        var klines = new[]
+        {
+            Candle(CreatedAt.AddMinutes(15), high: 112m, low: 105m)
+        };
+
+        ExitTargetEvaluator.Apply(signal, klines, CreatedAt.AddHours(1));
+
+        Assert.Null(signal.StopMinutes);
+        Assert.Null(signal.CautiousMinutes);
+    }
+
+    [Fact]
+    public void Apply_IgnoresTouchesAfterTheCountingWindow()
+    {
+        var signal = NewSignal();
+        var countUntil = CreatedAt.AddHours(2);
+        var klines = new[]
+        {
+            Candle(CreatedAt.AddHours(3), high: 120m, low: 90m)
+        };
+
+        ExitTargetEvaluator.Apply(signal, klines, CreatedAt.AddHours(3), countUntil);
+
+        Assert.Null(signal.CautiousReachedAt);
+        Assert.Null(signal.StopReachedAt);
+        Assert.NotNull(signal.TargetsClosedAt);
+    }
+
     private static Signal NewSignal()
     {
         var plan = PositionPlan.Create(100m, 99m);

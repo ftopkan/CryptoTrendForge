@@ -3,6 +3,8 @@ using CryptoTrendForge.Core.Domain.Enums;
 
 namespace CryptoTrendForge.Worker.Services;
 
+public readonly record struct TrendAssessment(int Score, bool IsBearAligned, string? Reason, decimal? Ema20ExtensionPct = null);
+
 public sealed class TechnicalAnalysisService
 {
     public decimal CalculateRsi(IEnumerable<Kline> klines, int period)
@@ -66,6 +68,42 @@ public sealed class TechnicalAnalysisService
         }
 
         return result;
+    }
+
+    public TrendAssessment EvaluateTrend(IReadOnlyList<decimal> closes)
+    {
+        if (closes.Count < 200)
+        {
+            return new TrendAssessment(0, false, null);
+        }
+
+        var ema20 = CalculateEma(closes, 20)[^1];
+        var ema50 = CalculateEma(closes, 50)[^1];
+        var ema200 = CalculateEma(closes, 200)[^1];
+
+        if (ema20 > ema50 && ema50 > ema200)
+        {
+            var close = closes[^1];
+            var extensionPct = ema20 == 0m ? 0m : Math.Round(((close - ema20) / ema20) * 100m, 2);
+            if (extensionPct > 8m)
+            {
+                return new TrendAssessment(18, false, "4 saatlik yükseliş uzamış; fiyat kısa ortalamadan kopmuş.", extensionPct);
+            }
+
+            return new TrendAssessment(25, false, "4 saatlikte kısa ortalama, uzun ortalamanın üstünde.", extensionPct);
+        }
+
+        if (ema20 > ema50 && ema50 < ema200)
+        {
+            return new TrendAssessment(12, false, "4 saatlik ortalamalar henüz net bir yöne oturmamış.");
+        }
+
+        if (ema20 < ema50 && ema50 < ema200)
+        {
+            return new TrendAssessment(0, true, null);
+        }
+
+        return new TrendAssessment(0, false, null);
     }
 
     public decimal[] FindSwingLows(IEnumerable<Kline> klines, int lookback, int neighborCount)

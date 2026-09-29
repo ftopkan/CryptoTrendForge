@@ -83,6 +83,59 @@ namespace CryptoTrendForge.Core.Migrations.SqlServer
                     b.ToTable("coins", (string)null);
                 });
 
+            modelBuilder.Entity("CryptoTrendForge.Core.Domain.Models.ScanNearMiss", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("BaseScore")
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<string>("BlockReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("CandidateThreshold")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CoinId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<decimal?>("Ema20ExtensionPct")
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<int>("PatternBonus")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("Rsi4H")
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<string>("ScoreBreakdown")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ScoreVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<decimal>("TotalScore")
+                        .HasColumnType("numeric(5,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CoinId", "CreatedAt");
+
+                    b.ToTable("scan_near_misses", (string)null);
+                });
+
             modelBuilder.Entity("CryptoTrendForge.Core.Domain.Models.Signal", b =>
                 {
                     b.Property<int>("Id")
@@ -166,6 +219,11 @@ namespace CryptoTrendForge.Core.Migrations.SqlServer
                     b.Property<string>("ScoreBreakdown")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("ScoreVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<decimal>("SignalPrice")
                         .HasColumnType("numeric(18,8)");
 
@@ -179,8 +237,14 @@ namespace CryptoTrendForge.Core.Migrations.SqlServer
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<int?>("StopMinutes")
+                        .HasColumnType("int");
+
                     b.Property<decimal?>("StopPrice")
                         .HasColumnType("numeric(18,8)");
+
+                    b.Property<DateTimeOffset?>("StopReachedAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<decimal>("SupportDistPct")
                         .HasColumnType("numeric(5,2)");
@@ -244,6 +308,17 @@ namespace CryptoTrendForge.Core.Migrations.SqlServer
                         .IsUnique();
 
                     b.ToTable("signal_outcomes", (string)null);
+                });
+
+            modelBuilder.Entity("CryptoTrendForge.Core.Domain.Models.ScanNearMiss", b =>
+                {
+                    b.HasOne("CryptoTrendForge.Core.Domain.Models.Coin", "Coin")
+                        .WithMany()
+                        .HasForeignKey("CoinId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Coin");
                 });
 
             modelBuilder.Entity("CryptoTrendForge.Core.Domain.Models.Signal", b =>

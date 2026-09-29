@@ -7,6 +7,8 @@ public sealed class ScoreResult
     public int TotalScore { get; set; }
     public decimal SupportLevel { get; set; }
     public decimal SupportDistancePct { get; set; }
+    public decimal? Rsi4H { get; set; }
+    public decimal? Ema20ExtensionPct { get; set; }
     public string? PatternName { get; set; }
     public string? PatternName15m { get; set; }
     public Dictionary<string, int> Breakdown { get; set; } = new();

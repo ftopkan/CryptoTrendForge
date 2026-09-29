@@ -127,6 +127,100 @@ public sealed class StockSignalTests
         Assert.DoesNotContain(score.Risks, risk => risk.Contains("Bitcoin", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void SessionCandle_KeepsTheAfternoonBarAndDropsTheOvernightBar()
+    {
+        var afternoon = new DateTimeOffset(2026, 9, 29, 16, 0, 0, TimeSpan.Zero);
+        var overnight = new DateTimeOffset(2026, 9, 29, 4, 0, 0, TimeSpan.Zero);
+
+        var premarket = new DateTimeOffset(2026, 9, 29, 12, 0, 0, TimeSpan.Zero);
+
+        Assert.True(UsEquitySession.OverlapsSession(afternoon, TimeSpan.FromHours(4), Settings));
+        Assert.False(UsEquitySession.OverlapsSession(premarket, TimeSpan.FromHours(4), Settings));
+        Assert.False(UsEquitySession.OverlapsSession(overnight, TimeSpan.FromHours(4), Settings));
+    }
+
+    [Fact]
+    public void EvaluationEnd_StopsAtTheClosingBellWhenTheFourHourClockRunsPastIt()
+    {
+        var created = new DateTimeOffset(2026, 9, 29, 18, 30, 0, TimeSpan.Zero);
+        var expires = created.AddHours(4);
+
+        var end = UsEquitySession.EvaluationEnd(created, expires, Settings);
+
+        Assert.Equal(new DateTimeOffset(2026, 9, 29, 20, 0, 0, TimeSpan.Zero), end);
+    }
+
+    [Fact]
+    public void EvaluationEnd_KeepsTheFourHourClockWhenItClosesBeforeTheBell()
+    {
+        var created = new DateTimeOffset(2026, 9, 29, 14, 0, 0, TimeSpan.Zero);
+        var expires = created.AddHours(4);
+
+        var end = UsEquitySession.EvaluationEnd(created, expires, Settings);
+
+        Assert.Equal(expires, end);
+    }
+
+    [Fact]
+    public void Engine_IgnoresAnOvernightCandlePattern()
+    {
+        var engine = CreateEngine();
+        var overnight = new MarketSnapshot
+        {
+            Symbol = "AAPLUSDT",
+            CurrentPrice = 100m,
+            Klines4H =
+            [
+                Bar(new DateTimeOffset(2026, 9, 29, 0, 0, 0, TimeSpan.Zero), 100m, 101m),
+                Bar(new DateTimeOffset(2026, 9, 29, 4, 0, 0, TimeSpan.Zero), 110m, 100m),
+                Bar(new DateTimeOffset(2026, 9, 29, 8, 0, 0, TimeSpan.Zero), 99m, 112m)
+            ]
+        };
+        var session = new MarketSnapshot
+        {
+            Symbol = "AAPLUSDT",
+            CurrentPrice = 100m,
+            Klines4H =
+            [
+                Bar(new DateTimeOffset(2026, 9, 28, 16, 0, 0, TimeSpan.Zero), 100m, 101m),
+                Bar(new DateTimeOffset(2026, 9, 29, 16, 0, 0, TimeSpan.Zero), 110m, 100m),
+                Bar(new DateTimeOffset(2026, 9, 30, 16, 0, 0, TimeSpan.Zero), 99m, 112m)
+            ]
+        };
+
+        Assert.Equal(0, engine.CalculateScore(overnight).PatternBonus);
+        Assert.Equal(10, engine.CalculateScore(session).PatternBonus);
+    }
+
+    [Fact]
+    public void Engine_ScoresAShortHistoryFromTheFastAveragesOnly()
+    {
+        var engine = CreateEngine();
+        var candles = new List<Kline>();
+        var day = new DateTimeOffset(2026, 6, 1, 16, 0, 0, TimeSpan.Zero);
+        var price = 100m;
+        while (candles.Count < 60)
+        {
+            if (day.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
+            {
+                candles.Add(Bar(day, price, price + 0.2m));
+                price += 0.2m;
+            }
+
+            day = day.AddDays(1);
+        }
+
+        var score = engine.CalculateScore(new MarketSnapshot
+        {
+            Symbol = "AAPLUSDT",
+            CurrentPrice = price,
+            Klines4H = candles
+        });
+
+        Assert.Equal(12, score.Breakdown["trend"]);
+    }
+
     private static StockSignalEngine CreateEngine()
     {
         return new StockSignalEngine(
@@ -158,5 +252,18 @@ public sealed class StockSignalTests
         }
 
         return candles;
+    }
+
+    private static Kline Bar(DateTimeOffset openTime, decimal open, decimal close)
+    {
+        return new Kline
+        {
+            OpenTime = openTime,
+            Open = open,
+            High = Math.Max(open, close) + 0.2m,
+            Low = Math.Min(open, close) - 0.2m,
+            Close = close,
+            Volume = 100m
+        };
     }
 }

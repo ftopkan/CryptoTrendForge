@@ -24,6 +24,8 @@ public sealed class StockRiskFilterService
             return FilterResult.Blocked("US equity market is closed.");
         }
 
+        snapshot = UsEquitySession.WithSessionFourHourCandles(snapshot, _stockOptions);
+
         if (Is4hBearAligned(snapshot.Klines4H))
         {
             return FilterResult.Blocked("4H EMA20 < EMA50 < EMA200 hard filter.");

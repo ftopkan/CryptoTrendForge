@@ -45,13 +45,37 @@ public sealed class MarketDataService
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<MarketSnapshot?> GetMarketSnapshotAsync(
+    public Task<MarketSnapshot?> GetMarketSnapshotAsync(
         string symbol,
         CancellationToken cancellationToken = default)
     {
-        var kline15Task = GetKlinesCachedAsync(symbol, "15", cancellationToken);
-        var kline1hTask = GetKlinesCachedAsync(symbol, "60", cancellationToken);
-        var kline4hTask = GetKlinesCachedAsync(symbol, "240", cancellationToken);
+        return LoadSnapshotAsync(symbol, fourHourLimit: 200, cancellationToken);
+    }
+
+    public Task<MarketSnapshot?> GetStockMarketSnapshotAsync(
+        string symbol,
+        CancellationToken cancellationToken = default)
+    {
+        return LoadSnapshotAsync(symbol, fourHourLimit: 1000, fourHourPages: 3, cancellationToken);
+    }
+
+    private async Task<MarketSnapshot?> LoadSnapshotAsync(
+        string symbol,
+        int fourHourLimit,
+        CancellationToken cancellationToken)
+    {
+        return await LoadSnapshotAsync(symbol, fourHourLimit, fourHourPages: 1, cancellationToken);
+    }
+
+    private async Task<MarketSnapshot?> LoadSnapshotAsync(
+        string symbol,
+        int fourHourLimit,
+        int fourHourPages,
+        CancellationToken cancellationToken)
+    {
+        var kline15Task = GetKlinesCachedAsync(symbol, "15", 200, 1, cancellationToken);
+        var kline1hTask = GetKlinesCachedAsync(symbol, "60", 200, 1, cancellationToken);
+        var kline4hTask = GetKlinesCachedAsync(symbol, "240", fourHourLimit, fourHourPages, cancellationToken);
         var oi1hTask = GetOpenInterestChangePctCachedAsync(symbol, "1h", cancellationToken);
         var oi4hTask = GetOpenInterestChangePctCachedAsync(symbol, "4h", cancellationToken);
         var fundingTask = GetFundingRateCachedAsync(symbol, cancellationToken);
@@ -83,9 +107,9 @@ public sealed class MarketDataService
     public async Task<BtcSnapshot?> GetBtcSnapshotAsync(CancellationToken cancellationToken = default)
     {
         var symbol = "BTCUSDT";
-        var kline15Task = GetKlinesCachedAsync(symbol, "15", cancellationToken);
-        var kline1hTask = GetKlinesCachedAsync(symbol, "60", cancellationToken);
-        var kline4hTask = GetKlinesCachedAsync(symbol, "240", cancellationToken);
+        var kline15Task = GetKlinesCachedAsync(symbol, "15", 200, 1, cancellationToken);
+        var kline1hTask = GetKlinesCachedAsync(symbol, "60", 200, 1, cancellationToken);
+        var kline4hTask = GetKlinesCachedAsync(symbol, "240", 200, 1, cancellationToken);
         var tickerTask = GetTickerCachedAsync(symbol, cancellationToken);
 
         await Task.WhenAll(kline15Task, kline1hTask, kline4hTask, tickerTask);
@@ -109,17 +133,52 @@ public sealed class MarketDataService
     private async Task<IReadOnlyList<Kline>> GetKlinesCachedAsync(
         string symbol,
         string interval,
+        int limit,
+        int pages,
         CancellationToken cancellationToken)
     {
-        var key = BuildCacheKey(symbol, interval, "kline");
+        var key = BuildCacheKey(symbol, $"{interval}:{limit}:{pages}", "kline");
         if (_cache.TryGet<IReadOnlyList<Kline>>(key, out var cached) && cached is not null)
         {
             return cached;
         }
 
-        var klines = await _bybitService.GetKlinesAsync(symbol, interval, 200, cancellationToken);
+        var klines = await GetKlinePagesAsync(symbol, interval, limit, pages, cancellationToken);
         _cache.Set(key, klines, GetKlineTtl(interval));
         return klines;
+    }
+
+    private async Task<IReadOnlyList<Kline>> GetKlinePagesAsync(
+        string symbol,
+        string interval,
+        int limit,
+        int pages,
+        CancellationToken cancellationToken)
+    {
+        var merged = new List<Kline>();
+        long? endTimeMs = null;
+        for (var page = 0; page < pages; page++)
+        {
+            var batch = await _bybitService.GetKlinesAsync(symbol, interval, limit, endTimeMs, cancellationToken);
+            if (batch.Count == 0)
+            {
+                break;
+            }
+
+            merged.AddRange(batch);
+            if (batch.Count < limit)
+            {
+                break;
+            }
+
+            endTimeMs = batch.Min(x => x.OpenTime).ToUnixTimeMilliseconds() - 1;
+        }
+
+        return merged
+            .GroupBy(x => x.OpenTime)
+            .Select(x => x.First())
+            .OrderBy(x => x.OpenTime)
+            .ToArray();
     }
 
     private async Task<decimal> GetOpenInterestChangePctCachedAsync(
@@ -133,7 +192,7 @@ public sealed class MarketDataService
             return cached;
         }
 
-        var value = await _bybitService.GetOpenInterestChangePctAsync(symbol, intervalTime, 50, cancellationToken);
+        var value = await _bybitService.GetOpenInterestChangePctAsync(symbol, intervalTime, 2, cancellationToken);
         _cache.Set(key, value, OpenInterestTtl);
         return value;
     }

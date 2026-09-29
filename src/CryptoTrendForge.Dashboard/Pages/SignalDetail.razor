@@ -56,7 +56,7 @@ else
                     </thead>
                     <tbody>
                         <tr><td>Entry</td><td class="font-monospace">@detail.EntryPrice</td><td></td></tr>
-                        <tr><td>Stop</td><td class="font-monospace">@detail.StopPrice</td><td></td></tr>
+                        <tr><td>Stop</td><td colspan="2"><TargetCell Price="@detail.StopPrice" Minutes="@detail.StopMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
                         <tr><td>Cautious</td><td colspan="2"><TargetCell Price="@detail.CautiousExit" Minutes="@detail.CautiousMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
                         <tr><td>Balanced</td><td colspan="2"><TargetCell Price="@detail.BalancedExit" Minutes="@detail.BalancedMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
                         <tr><td>Wide</td><td colspan="2"><TargetCell Price="@detail.WideExit" Minutes="@detail.WideMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>

@@ -1,4 +1,5 @@
 using CryptoTrendForge.Core.Domain;
+using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Worker.Configuration;
 using CryptoTrendForge.Worker.Infrastructure;
 using CryptoTrendForge.Worker.Services;
@@ -11,17 +12,20 @@ public sealed class SignalOutcomeWorker : BackgroundService
     private static readonly int[] SnapshotMinutes = [15, 30, 60, 240];
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly BotOptions _botOptions;
+    private readonly StockOptions _stockOptions;
     private readonly RunOnceCoordinator _runOnceCoordinator;
     private readonly ILogger<SignalOutcomeWorker> _logger;
 
     public SignalOutcomeWorker(
         IServiceScopeFactory scopeFactory,
         IOptions<BotOptions> botOptions,
+        IOptions<StockOptions> stockOptions,
         RunOnceCoordinator runOnceCoordinator,
         ILogger<SignalOutcomeWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _botOptions = botOptions.Value;
+        _stockOptions = stockOptions.Value;
         _runOnceCoordinator = runOnceCoordinator;
         _logger = logger;
     }
@@ -126,7 +130,13 @@ public sealed class SignalOutcomeWorker : BackgroundService
                 continue;
             }
 
-            ExitTargetEvaluator.Apply(signal, klines, now);
+            DateTimeOffset? countUntil = null;
+            if (signal.Coin.CoinType == CoinType.Stock && signal.ExpiresAt is DateTimeOffset expiresAt)
+            {
+                countUntil = UsEquitySession.EvaluationEnd(signal.CreatedAt, expiresAt, _stockOptions);
+            }
+
+            ExitTargetEvaluator.Apply(signal, klines, now, countUntil);
             changed = true;
         }
 

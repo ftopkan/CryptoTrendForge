@@ -87,7 +87,7 @@ public sealed class StockSignalScanWorker : BackgroundService
         string? bestSymbol = null;
         foreach (var stock in stocks)
         {
-            var snapshot = await marketDataService.GetMarketSnapshotAsync(stock.Symbol, cancellationToken);
+            var snapshot = await marketDataService.GetStockMarketSnapshotAsync(stock.Symbol, cancellationToken);
             if (snapshot is null)
             {
                 continue;
@@ -96,13 +96,20 @@ public sealed class StockSignalScanWorker : BackgroundService
             await signalRepository.InvalidateIfBrokenSupportAsync(stock.Id, snapshot.CurrentPrice, cancellationToken);
 
             var filterResult = riskFilterService.Check(snapshot, now);
+            var scoreResult = signalEngine.CalculateScore(snapshot);
+            await signalRepository.RecordNearMissIfNeededAsync(
+                stock,
+                scoreResult,
+                _stockOptions.Candidate,
+                filterResult.IsBlocked,
+                filterResult.Reason,
+                now,
+                cancellationToken);
             if (filterResult.IsBlocked)
             {
                 _logger.LogDebug("Stock signal blocked for {Symbol}: {Reason}", stock.Symbol, filterResult.Reason);
                 continue;
             }
-
-            var scoreResult = signalEngine.CalculateScore(snapshot);
             if (scoreResult.TotalScore > bestScore)
             {
                 bestScore = scoreResult.TotalScore;

@@ -104,6 +104,7 @@ public sealed class SignalRepository
         var signal = new Signal
         {
             CoinId = coin.Id,
+            ScoreVersion = NearMissRule.FormulaVersion,
             Score = scoreResult.BaseScore,
             PatternBonus = scoreResult.PatternBonus,
             TotalScore = scoreResult.TotalScore,
@@ -136,6 +137,55 @@ public sealed class SignalRepository
         _dbContext.Signals.Add(signal);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return signal;
+    }
+
+    public async Task RecordNearMissIfNeededAsync(
+        Coin coin,
+        ScoreResult scoreResult,
+        int candidateThreshold,
+        bool blocked,
+        string? blockReason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        if (!NearMissRule.ShouldRecord(scoreResult.TotalScore, candidateThreshold, blocked))
+        {
+            return;
+        }
+
+        var reason = string.IsNullOrWhiteSpace(blockReason) ? null : blockReason;
+        if (reason is not null && reason.Length > 300)
+        {
+            reason = reason[..300];
+        }
+
+        var since = now.AddHours(-1);
+        var duplicate = await _dbContext.ScanNearMisses.AnyAsync(
+            x => x.CoinId == coin.Id
+                && x.CreatedAt >= since
+                && x.TotalScore == scoreResult.TotalScore
+                && x.BlockReason == reason,
+            cancellationToken);
+        if (duplicate)
+        {
+            return;
+        }
+
+        _dbContext.ScanNearMisses.Add(new ScanNearMiss
+        {
+            CoinId = coin.Id,
+            ScoreVersion = NearMissRule.FormulaVersion,
+            TotalScore = scoreResult.TotalScore,
+            BaseScore = scoreResult.BaseScore,
+            PatternBonus = scoreResult.PatternBonus,
+            CandidateThreshold = candidateThreshold,
+            BlockReason = reason,
+            Rsi4H = scoreResult.Rsi4H,
+            Ema20ExtensionPct = scoreResult.Ema20ExtensionPct,
+            ScoreBreakdown = JsonSerializer.SerializeToDocument(scoreResult.Breakdown),
+            CreatedAt = now
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task ActivateSignalAsync(int signalId, CancellationToken cancellationToken = default)

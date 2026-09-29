@@ -16,6 +16,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Coin> Coins => Set<Coin>();
     public DbSet<Signal> Signals => Set<Signal>();
     public DbSet<SignalOutcome> SignalOutcomes => Set<SignalOutcome>();
+    public DbSet<ScanNearMiss> ScanNearMisses => Set<ScanNearMiss>();
     public DbSet<BotConfiguration> BotConfigurations => Set<BotConfiguration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -45,6 +46,7 @@ public sealed class AppDbContext : DbContext
         {
             entity.ToTable("signals");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.ScoreVersion).HasDefaultValue(0);
             entity.Property(x => x.Score).HasColumnType("numeric(5,2)");
             entity.Property(x => x.PatternBonus).HasDefaultValue(0);
             entity.Property(x => x.TotalScore).HasColumnType("numeric(5,2)");
@@ -92,6 +94,26 @@ public sealed class AppDbContext : DbContext
             entity.HasOne(x => x.Signal)
                 .WithMany()
                 .HasForeignKey(x => x.SignalId);
+        });
+
+        modelBuilder.Entity<ScanNearMiss>(entity =>
+        {
+            entity.ToTable("scan_near_misses");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ScoreVersion).HasDefaultValue(0);
+            entity.Property(x => x.TotalScore).HasColumnType("numeric(5,2)");
+            entity.Property(x => x.BaseScore).HasColumnType("numeric(5,2)");
+            entity.Property(x => x.BlockReason).HasMaxLength(300);
+            entity.Property(x => x.Rsi4H).HasColumnType("numeric(8,2)");
+            entity.Property(x => x.Ema20ExtensionPct).HasColumnType("numeric(8,2)");
+            entity.Property(x => x.ScoreBreakdown)
+                .HasConversion(jsonDocumentConverter)
+                .HasColumnType(jsonType);
+            entity.Property(x => x.CreatedAt).HasDefaultValueSql(nowSql);
+            entity.HasIndex(x => new { x.CoinId, x.CreatedAt });
+            entity.HasOne(x => x.Coin)
+                .WithMany()
+                .HasForeignKey(x => x.CoinId);
         });
 
         modelBuilder.Entity<BotConfiguration>(entity =>

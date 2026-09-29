@@ -8,6 +8,7 @@ public sealed class Signal
     public int Id { get; set; }
     public int CoinId { get; set; }
     public Coin? Coin { get; set; }
+    public int ScoreVersion { get; set; }
     public decimal Score { get; set; }
     public int PatternBonus { get; set; }
     public decimal TotalScore { get; set; }
@@ -17,6 +18,8 @@ public sealed class Signal
     public decimal SignalPrice { get; set; }
     public decimal? EntryPrice { get; set; }
     public decimal? StopPrice { get; set; }
+    public DateTimeOffset? StopReachedAt { get; set; }
+    public int? StopMinutes { get; set; }
     public decimal? CautiousExit { get; set; }
     public decimal? BalancedExit { get; set; }
     public decimal? WideExit { get; set; }
