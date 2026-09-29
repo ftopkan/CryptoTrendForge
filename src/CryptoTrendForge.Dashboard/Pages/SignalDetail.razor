@@ -13,7 +13,7 @@ else if (detail is null)
 else
 {
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1 class="h3 mb-0">@detail.Symbol <span class="text-secondary">#@detail.Id</span></h1>
+        <h1 class="h3 mb-0">@detail.Symbol <span class="badge text-bg-secondary">@(detail.CoinType == CoinType.Stock ? "Hisse" : "Kripto")</span> <span class="text-secondary">#@detail.Id</span></h1>
         <a class="btn btn-outline-secondary btn-sm" href="/signals">Back</a>
     </div>
 
@@ -24,7 +24,14 @@ else
                 <ul class="list-group list-group-flush">
                     <li class="list-group-item d-flex justify-content-between"><span>Type</span><span>@detail.SignalType</span></li>
                     <li class="list-group-item d-flex justify-content-between"><span>Status</span><span class="badge text-bg-dark">@detail.Status</span></li>
-                    <li class="list-group-item d-flex justify-content-between"><span>Regime</span><RegimeIndicator Regime="@detail.Regime" /></li>
+                    @if (detail.CoinType == CoinType.Stock)
+                    {
+                        <li class="list-group-item d-flex justify-content-between"><span>Market</span><span>NYSE</span></li>
+                    }
+                    else
+                    {
+                        <li class="list-group-item d-flex justify-content-between"><span>Regime</span><RegimeIndicator Regime="@detail.Regime" /></li>
+                    }
                     <li class="list-group-item d-flex justify-content-between"><span>Total</span><span>@detail.TotalScore</span></li>
                     <li class="list-group-item d-flex justify-content-between"><span>Base / pattern</span><span>@detail.BaseScore / @detail.PatternBonus</span></li>
                     <li class="list-group-item d-flex justify-content-between"><span>Support</span><span class="font-monospace">@detail.SupportLevel</span></li>

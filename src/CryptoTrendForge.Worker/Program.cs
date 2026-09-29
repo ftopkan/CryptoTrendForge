@@ -24,6 +24,7 @@ builder.Configuration.AddJsonFile(
 builder.Services.AddSerilog(config => config.WriteTo.Console());
 
 builder.Services.AddSingleton<IValidateOptions<BotOptions>, BotOptionsValidator>();
+builder.Services.AddSingleton<IValidateOptions<StockOptions>, StockOptionsValidator>();
 builder.Services.AddSingleton<IValidateOptions<BybitOptions>, BybitOptionsValidator>();
 builder.Services
     .AddOptions<BotOptions>()
@@ -36,6 +37,10 @@ builder.Services
 builder.Services
     .AddOptions<TelegramOptions>()
     .Bind(builder.Configuration.GetSection(TelegramOptions.SectionName));
+builder.Services
+    .AddOptions<StockOptions>()
+    .Bind(builder.Configuration.GetSection(StockOptions.SectionName))
+    .ValidateOnStart();
 builder.Services.Configure<BybitClientOptions>(opt =>
 {
     opt.MaxRetries = builder.Configuration.GetValue<int>("Bybit:MaxRetries", 3);
@@ -54,11 +59,14 @@ builder.Services.AddScoped<MarketDataService>();
 builder.Services.AddScoped<BtcRegimeService>();
 builder.Services.AddScoped<RiskFilterService>();
 builder.Services.AddScoped<SignalEngine>();
+builder.Services.AddScoped<StockSignalEngine>();
+builder.Services.AddScoped<StockRiskFilterService>();
 builder.Services.AddScoped<SignalRepository>();
 builder.Services.AddScoped<TelegramService>();
 builder.Services.AddSingleton<RunOnceCoordinator>();
 builder.Services.AddHostedService<StartupInitializationService>();
 builder.Services.AddHostedService<SignalScanWorker>();
+builder.Services.AddHostedService<StockSignalScanWorker>();
 builder.Services.AddHostedService<SignalOutcomeWorker>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient<BybitHttpClient>((sp, client) =>

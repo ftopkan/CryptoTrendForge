@@ -32,6 +32,14 @@ else
                     <RateBar Label="Cautious" Percent="@snapshot.ExitTargets.CautiousHitRatePct" Value="@($"{snapshot.ExitTargets.CautiousHitRatePct}%")" />
                     <RateBar Label="Balanced" Percent="@snapshot.ExitTargets.BalancedHitRatePct" Value="@($"{snapshot.ExitTargets.BalancedHitRatePct}%")" />
                     <RateBar Label="Wide" Percent="@snapshot.ExitTargets.WideHitRatePct" Value="@($"{snapshot.ExitTargets.WideHitRatePct}%")" />
+                    <p class="text-secondary small mt-3 mb-1">Crypto closed plans: @snapshot.CryptoExitTargets.ClosedSignals</p>
+                    <RateBar Label="Crypto cautious" Percent="@snapshot.CryptoExitTargets.CautiousHitRatePct" Value="@($"{snapshot.CryptoExitTargets.CautiousHitRatePct}%")" />
+                    <RateBar Label="Crypto balanced" Percent="@snapshot.CryptoExitTargets.BalancedHitRatePct" Value="@($"{snapshot.CryptoExitTargets.BalancedHitRatePct}%")" />
+                    <RateBar Label="Crypto wide" Percent="@snapshot.CryptoExitTargets.WideHitRatePct" Value="@($"{snapshot.CryptoExitTargets.WideHitRatePct}%")" />
+                    <p class="text-secondary small mt-3 mb-1">Stock closed plans: @snapshot.StockExitTargets.ClosedSignals</p>
+                    <RateBar Label="Stock cautious" Percent="@snapshot.StockExitTargets.CautiousHitRatePct" Value="@($"{snapshot.StockExitTargets.CautiousHitRatePct}%")" />
+                    <RateBar Label="Stock balanced" Percent="@snapshot.StockExitTargets.BalancedHitRatePct" Value="@($"{snapshot.StockExitTargets.BalancedHitRatePct}%")" />
+                    <RateBar Label="Stock wide" Percent="@snapshot.StockExitTargets.WideHitRatePct" Value="@($"{snapshot.StockExitTargets.WideHitRatePct}%")" />
                     <RateBar Label="With pattern" Percent="@snapshot.PatternWithSuccessRate" Value="@($"{snapshot.PatternWithSuccessRate}%")" />
                     <RateBar Label="No pattern" Percent="@snapshot.PatternWithoutSuccessRate" Value="@($"{snapshot.PatternWithoutSuccessRate}%")" />
                 </div>

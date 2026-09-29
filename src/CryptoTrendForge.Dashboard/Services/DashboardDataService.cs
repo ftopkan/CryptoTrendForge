@@ -53,6 +53,11 @@ public sealed class DashboardDataService
             query = query.Where(x => x.MarketRegime == filter.Regime.Value);
         }
 
+        if (filter.CoinType.HasValue)
+        {
+            query = query.Where(x => x.Coin != null && x.Coin.CoinType == filter.CoinType.Value);
+        }
+
         if (filter.PatternBonusOnly)
         {
             query = query.Where(x => x.PatternBonus > 0);
@@ -64,6 +69,7 @@ public sealed class DashboardDataService
             {
                 Id = x.Id,
                 Symbol = x.Coin != null ? x.Coin.Symbol : "?",
+                CoinType = x.Coin != null ? x.Coin.CoinType : CoinType.Crypto,
                 TotalScore = x.TotalScore,
                 BaseScore = x.Score,
                 PatternBonus = x.PatternBonus,
@@ -99,6 +105,7 @@ public sealed class DashboardDataService
         {
             Id = signal.Id,
             Symbol = signal.Coin?.Symbol ?? "?",
+            CoinType = signal.Coin?.CoinType ?? CoinType.Crypto,
             BaseScore = signal.Score,
             PatternBonus = signal.PatternBonus,
             TotalScore = signal.TotalScore,
@@ -164,6 +171,7 @@ public sealed class DashboardDataService
             {
                 Id = x.Id,
                 Symbol = x.Coin != null ? x.Coin.Symbol : "?",
+                CoinType = x.Coin != null ? x.Coin.CoinType : CoinType.Crypto,
                 CreatedAt = x.CreatedAt,
                 EntryPrice = x.EntryPrice,
                 StopPrice = x.StopPrice,
@@ -228,15 +236,27 @@ public sealed class DashboardDataService
             PatternWithSuccessRate = ComputeSuccessRate(withPattern),
             PatternWithoutSuccessRate = ComputeSuccessRate(withoutPattern),
             RegimeBuckets = BuildRegimeBuckets(mapped),
-            ExitTargets = await BuildExitTargetSummaryAsync(db, cancellationToken)
+            ExitTargets = await BuildExitTargetSummaryAsync(db, null, cancellationToken),
+            CryptoExitTargets = await BuildExitTargetSummaryAsync(db, CoinType.Crypto, cancellationToken),
+            StockExitTargets = await BuildExitTargetSummaryAsync(db, CoinType.Stock, cancellationToken)
         };
     }
 
-    private static async Task<ExitTargetSummary> BuildExitTargetSummaryAsync(AppDbContext db, CancellationToken cancellationToken)
+    private static async Task<ExitTargetSummary> BuildExitTargetSummaryAsync(
+        AppDbContext db,
+        CoinType? coinType,
+        CancellationToken cancellationToken)
     {
-        var closed = await db.Signals
+        var query = db.Signals
             .AsNoTracking()
-            .Where(x => x.TargetsClosedAt != null && x.CautiousExit != null)
+            .Where(x => x.TargetsClosedAt != null && x.CautiousExit != null);
+
+        if (coinType.HasValue)
+        {
+            query = query.Where(x => x.Coin != null && x.Coin.CoinType == coinType.Value);
+        }
+
+        var closed = await query
             .Select(x => new
             {
                 x.CautiousReachedAt,
@@ -361,6 +381,7 @@ public sealed class SignalFilter
     public decimal? MinScore { get; set; }
     public SignalStatus? Status { get; set; }
     public MarketRegime? Regime { get; set; }
+    public CoinType? CoinType { get; set; }
     public bool PatternBonusOnly { get; set; }
 }
 
@@ -368,6 +389,7 @@ public sealed class SignalListItem
 {
     public int Id { get; set; }
     public string Symbol { get; set; } = string.Empty;
+    public CoinType CoinType { get; set; }
     public decimal BaseScore { get; set; }
     public int PatternBonus { get; set; }
     public decimal TotalScore { get; set; }
@@ -381,6 +403,7 @@ public sealed class SignalDetailView
 {
     public int Id { get; set; }
     public string Symbol { get; set; } = string.Empty;
+    public CoinType CoinType { get; set; }
     public decimal BaseScore { get; set; }
     public int PatternBonus { get; set; }
     public decimal TotalScore { get; set; }
@@ -429,12 +452,15 @@ public sealed class PerformanceSnapshot
     public List<PerformanceBucket> CoinBuckets { get; set; } = [];
     public List<PerformanceBucket> RegimeBuckets { get; set; } = [];
     public ExitTargetSummary ExitTargets { get; set; } = new();
+    public ExitTargetSummary CryptoExitTargets { get; set; } = new();
+    public ExitTargetSummary StockExitTargets { get; set; } = new();
 }
 
 public sealed class ExitTargetRow
 {
     public int Id { get; set; }
     public string Symbol { get; set; } = string.Empty;
+    public CoinType CoinType { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public decimal? EntryPrice { get; set; }
     public decimal? StopPrice { get; set; }

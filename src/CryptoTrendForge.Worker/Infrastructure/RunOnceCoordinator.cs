@@ -41,5 +41,5 @@ public sealed class RunOnceCoordinator
         }
     }
 
-    private const int WorkerCount = 2;
+    private const int WorkerCount = 3;
 }

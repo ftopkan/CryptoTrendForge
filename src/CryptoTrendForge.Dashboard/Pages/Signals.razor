@@ -34,6 +34,14 @@ else
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label">Asset</label>
+                    <select class="form-select" @bind="coinTypeText">
+                        <option value="">All</option>
+                        <option value="@CoinType.Crypto">Crypto</option>
+                        <option value="@CoinType.Stock">Stock</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label">Regime</label>
                     <select class="form-select" @bind="regimeText">
                         <option value="">All</option>
@@ -81,12 +89,12 @@ else
                     {
                         <tr>
                             <td><a href="/signals/@item.Id">@item.Id</a></td>
-                            <td class="fw-semibold">@item.Symbol</td>
+                            <td class="fw-semibold">@item.Symbol <span class="badge text-bg-secondary">@(item.CoinType == CoinType.Stock ? "Hisse" : "Kripto")</span></td>
                             <td>@item.TotalScore</td>
                             <td>@item.BaseScore</td>
                             <td>@item.PatternBonus</td>
                             <td><span class="badge text-bg-dark">@item.Status</span></td>
-                            <td><RegimeIndicator Regime="@item.Regime" /></td>
+                            <td>@if (item.CoinType == CoinType.Stock) { <span class="text-secondary">—</span> } else { <RegimeIndicator Regime="@item.Regime" /> }</td>
                             <td>@item.SignalType</td>
                             <td class="text-nowrap">@item.CreatedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
                         </tr>
@@ -102,6 +110,7 @@ else
     private decimal? minScoreInput;
     private string statusText = string.Empty;
     private string regimeText = string.Empty;
+    private string coinTypeText = string.Empty;
     private IReadOnlyList<SignalListItem> signals = [];
 
     protected override async Task OnInitializedAsync()
@@ -117,6 +126,7 @@ else
         filter.MinScore = minScoreInput;
         filter.Status = Enum.TryParse<SignalStatus>(statusText, out var status) ? status : null;
         filter.Regime = Enum.TryParse<MarketRegime>(regimeText, out var regime) ? regime : null;
+        filter.CoinType = Enum.TryParse<CoinType>(coinTypeText, out var coinType) ? coinType : null;
         signals = await DataService.GetSignalsAsync(filter);
     }
 }

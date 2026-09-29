@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -34,6 +35,7 @@ public sealed class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Symbol).HasMaxLength(20).IsRequired();
             entity.Property(x => x.DisplayName).HasMaxLength(10).IsRequired();
+            entity.Property(x => x.CoinType).HasConversion<int>().HasDefaultValue(CoinType.Crypto);
             entity.Property(x => x.IsActive).HasDefaultValue(true);
             entity.Property(x => x.CreatedAt).HasDefaultValueSql(nowSql);
             entity.HasIndex(x => x.Symbol).IsUnique();

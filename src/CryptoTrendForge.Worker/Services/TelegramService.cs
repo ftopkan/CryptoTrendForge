@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http.Json;
 using System.Text;
 using CryptoTrendForge.Core.Domain;
+using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Worker.Configuration;
 using Microsoft.Extensions.Options;
@@ -28,6 +29,7 @@ public sealed class TelegramService
         Signal signal,
         ScoreResult scoreResult,
         MarketSnapshot snapshot,
+        CoinType coinType = CoinType.Crypto,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_telegramOptions.BotToken) || string.IsNullOrWhiteSpace(_telegramOptions.ChatId))
@@ -40,7 +42,7 @@ public sealed class TelegramService
         {
             var client = _httpClientFactory.CreateClient();
             var url = $"https://api.telegram.org/bot{_telegramOptions.BotToken}/sendMessage";
-            var message = BuildMessage(signal, scoreResult, snapshot);
+            var message = BuildMessage(signal, scoreResult, snapshot, coinType);
             var request = new
             {
                 chat_id = _telegramOptions.ChatId,
@@ -81,7 +83,7 @@ public sealed class TelegramService
             var request = new
             {
                 chat_id = _telegramOptions.AdminChatId,
-                text = $"⚠️ Yönetici uyarısı\n{DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC\n{message}"
+                text = $"⚠️ Yönetici uyarısı\n{TurkeyTime.Format(DateTimeOffset.UtcNow)}\n{message}"
             };
 
             using var response = await client.PostAsJsonAsync(url, request, cancellationToken);
@@ -98,19 +100,24 @@ public sealed class TelegramService
 
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
 
-    private string BuildMessage(Signal signal, ScoreResult scoreResult, MarketSnapshot snapshot)
+    private string BuildMessage(Signal signal, ScoreResult scoreResult, MarketSnapshot snapshot, CoinType coinType)
     {
         var sb = new StringBuilder();
-        var typeText = signal.SignalType == Core.Domain.Enums.SignalType.StrongLongCandidate
-            ? "🔥 GÜÇLÜ LONG ADAYI"
-            : "🟢 LONG ADAYI";
+        var isStock = coinType == CoinType.Stock;
+        var typeText = signal.SignalType == SignalType.StrongLongCandidate
+            ? isStock ? "📊 HİSSE GÜÇLÜ LONG ADAYI" : "🔥 GÜÇLÜ LONG ADAYI"
+            : isStock ? "📊 HİSSE LONG ADAYI" : "🟢 LONG ADAYI";
 
         var plan = PositionPlan.Create(snapshot.CurrentPrice, scoreResult.SupportLevel);
 
         sb.AppendLine(typeText);
         sb.AppendLine();
         sb.AppendLine($"💎 {snapshot.Symbol} · ${FormatPrice(snapshot.CurrentPrice)}");
-        sb.AppendLine($"🕒 {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+        sb.AppendLine($"🕒 {TurkeyTime.Format(DateTimeOffset.UtcNow)}");
+        if (isStock)
+        {
+            sb.AppendLine("🏛 Borsa: NYSE açık");
+        }
         sb.AppendLine();
         sb.Append("📊 Temel skor: ")
             .Append(scoreResult.BaseScore.ToString(Turkish))

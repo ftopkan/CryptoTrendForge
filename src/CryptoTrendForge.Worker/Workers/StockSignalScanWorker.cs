@@ -8,23 +8,26 @@ using Microsoft.Extensions.Options;
 
 namespace CryptoTrendForge.Worker.Workers;
 
-public sealed class SignalScanWorker : BackgroundService
+public sealed class StockSignalScanWorker : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly BotOptions _botOptions;
+    private readonly StockOptions _stockOptions;
     private readonly MarketDataCache _marketDataCache;
     private readonly RunOnceCoordinator _runOnceCoordinator;
-    private readonly ILogger<SignalScanWorker> _logger;
+    private readonly ILogger<StockSignalScanWorker> _logger;
 
-    public SignalScanWorker(
+    public StockSignalScanWorker(
         IServiceScopeFactory scopeFactory,
         IOptions<BotOptions> botOptions,
+        IOptions<StockOptions> stockOptions,
         MarketDataCache marketDataCache,
         RunOnceCoordinator runOnceCoordinator,
-        ILogger<SignalScanWorker> logger)
+        ILogger<StockSignalScanWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _botOptions = botOptions.Value;
+        _stockOptions = stockOptions.Value;
         _marketDataCache = marketDataCache;
         _runOnceCoordinator = runOnceCoordinator;
         _logger = logger;
@@ -35,7 +38,7 @@ public sealed class SignalScanWorker : BackgroundService
         if (_botOptions.RunOnce)
         {
             await RunScanIterationAsync(stoppingToken);
-            _runOnceCoordinator.NotifyWorkerCompleted(nameof(SignalScanWorker));
+            _runOnceCoordinator.NotifyWorkerCompleted(nameof(StockSignalScanWorker));
             return;
         }
 
@@ -54,92 +57,74 @@ public sealed class SignalScanWorker : BackgroundService
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            // Expected during shutdown.
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Signal scan iteration failed.");
+            _logger.LogError(ex, "Stock signal scan iteration failed.");
         }
     }
 
     private async Task ScanAsync(CancellationToken cancellationToken)
     {
+        var now = DateTimeOffset.UtcNow;
+        if (_stockOptions.ScanOnlyDuringMarketHours && !UsEquitySession.IsOpen(now, _stockOptions))
+        {
+            _logger.LogInformation("Stock scan skipped because the US equity market is closed.");
+            return;
+        }
+
         using var scope = _scopeFactory.CreateScope();
         var marketDataService = scope.ServiceProvider.GetRequiredService<MarketDataService>();
-        var btcRegimeService = scope.ServiceProvider.GetRequiredService<BtcRegimeService>();
-        var riskFilterService = scope.ServiceProvider.GetRequiredService<RiskFilterService>();
-        var signalEngine = scope.ServiceProvider.GetRequiredService<SignalEngine>();
+        var riskFilterService = scope.ServiceProvider.GetRequiredService<StockRiskFilterService>();
+        var signalEngine = scope.ServiceProvider.GetRequiredService<StockSignalEngine>();
         var signalRepository = scope.ServiceProvider.GetRequiredService<SignalRepository>();
         var telegramService = scope.ServiceProvider.GetRequiredService<TelegramService>();
 
-        var now = DateTimeOffset.UtcNow;
         await signalRepository.ExpireDueSignalsAsync(now, cancellationToken);
 
-        var btcSnapshot = await marketDataService.GetBtcSnapshotAsync(cancellationToken);
-        if (btcSnapshot is null)
-        {
-            _logger.LogWarning("BTC snapshot could not be fetched; skipping this scan cycle.");
-            return;
-        }
-
-        var regimeResult = btcRegimeService.DetermineRegime(btcSnapshot);
-        if (regimeResult.SkipScan)
-        {
-            _logger.LogWarning("Skipping scan because BTC regime requested skip. Reason: {Reason}", regimeResult.SkipReason);
-            return;
-        }
-
-        var coins = await marketDataService.GetActiveCoinsAsync(cancellationToken);
+        var stocks = await marketDataService.GetActiveStocksAsync(cancellationToken);
         var bestScore = 0;
         string? bestSymbol = null;
-        foreach (var coin in coins)
+        foreach (var stock in stocks)
         {
-            var snapshot = await marketDataService.GetMarketSnapshotAsync(coin.Symbol, cancellationToken);
+            var snapshot = await marketDataService.GetMarketSnapshotAsync(stock.Symbol, cancellationToken);
             if (snapshot is null)
             {
                 continue;
             }
 
-            await signalRepository.InvalidateIfBrokenSupportAsync(coin.Id, snapshot.CurrentPrice, cancellationToken);
+            await signalRepository.InvalidateIfBrokenSupportAsync(stock.Id, snapshot.CurrentPrice, cancellationToken);
 
-            var filterResult = riskFilterService.Check(snapshot, btcSnapshot, regimeResult);
+            var filterResult = riskFilterService.Check(snapshot, now);
             if (filterResult.IsBlocked)
             {
-                _logger.LogDebug("Signal blocked for {Symbol}: {Reason}", coin.Symbol, filterResult.Reason);
+                _logger.LogDebug("Stock signal blocked for {Symbol}: {Reason}", stock.Symbol, filterResult.Reason);
                 continue;
             }
 
-            if (_botOptions.BtcRiskOffBlockEnabled && regimeResult.Regime == MarketRegime.RiskOff)
-            {
-                _logger.LogDebug("Risk-off blocking enabled, skipping signal generation for {Symbol}.", coin.Symbol);
-                continue;
-            }
-
-            var scoreResult = signalEngine.CalculateScore(snapshot, regimeResult.Regime);
-            var (candidateThreshold, strongThreshold) = ResolveThresholds(regimeResult.Regime);
+            var scoreResult = signalEngine.CalculateScore(snapshot);
             if (scoreResult.TotalScore > bestScore)
             {
                 bestScore = scoreResult.TotalScore;
-                bestSymbol = coin.Symbol;
+                bestSymbol = stock.Symbol;
             }
 
-            if (scoreResult.TotalScore < candidateThreshold)
+            if (scoreResult.TotalScore < _stockOptions.Candidate)
             {
                 if (scoreResult.TotalScore >= 60)
                 {
                     _logger.LogInformation(
-                        "Watchlist {Symbol}: score {Score} under threshold {Threshold}.",
-                        coin.Symbol,
+                        "Stock watchlist {Symbol}: score {Score} under threshold {Threshold}.",
+                        stock.Symbol,
                         scoreResult.TotalScore,
-                        candidateThreshold);
+                        _stockOptions.Candidate);
                 }
 
                 continue;
             }
 
-            var activeSignal = await ResolveActiveSignalAsync(signalRepository, coin.Id, coin.Symbol, cancellationToken);
-            var latestSignal = await signalRepository.GetLatestSignalByCoinIdAsync(coin.Id, cancellationToken);
-
+            var activeSignal = await ResolveActiveSignalAsync(signalRepository, stock.Id, stock.Symbol, cancellationToken);
+            var latestSignal = await signalRepository.GetLatestSignalByCoinIdAsync(stock.Id, cancellationToken);
             if (latestSignal is not null)
             {
                 var inCooldown = now < latestSignal.CreatedAt.AddHours(_botOptions.CooldownHours);
@@ -164,31 +149,31 @@ public sealed class SignalScanWorker : BackgroundService
                 await signalRepository.MarkSupersededAsync(activeSignal.Id, cancellationToken);
             }
 
-            var signalType = scoreResult.TotalScore >= strongThreshold
+            var signalType = scoreResult.TotalScore >= _stockOptions.Strong
                 ? SignalType.StrongLongCandidate
                 : SignalType.LongCandidate;
 
             var signal = await signalRepository.CreateSignalAsync(
-                coin,
+                stock,
                 scoreResult,
                 signalType,
-                regimeResult.Regime,
+                MarketRegime.Neutral,
                 snapshot.CurrentPrice,
                 scoreResult.SupportLevel,
                 scoreResult.SupportDistancePct,
                 snapshot.FundingRate,
-                regimeResult.Regime.ToString(),
+                null,
                 now.AddHours(_botOptions.CooldownHours),
                 cancellationToken);
 
-            var sent = await telegramService.SendSignalAsync(signal, scoreResult, snapshot, CoinType.Crypto, cancellationToken);
+            var sent = await telegramService.SendSignalAsync(signal, scoreResult, snapshot, CoinType.Stock, cancellationToken);
             if (sent)
             {
                 await signalRepository.ActivateSignalAsync(signal.Id, cancellationToken);
-                _marketDataCache.Set($"active_signal:{coin.Symbol}".ToLowerInvariant(), true, TimeSpan.FromHours(_botOptions.CooldownHours));
+                _marketDataCache.Set($"active_signal:{stock.Symbol}".ToLowerInvariant(), true, TimeSpan.FromHours(_botOptions.CooldownHours));
                 _logger.LogInformation(
-                    "Signal activated for {Symbol}: id={SignalId}, type={SignalType}, totalScore={Score}.",
-                    coin.Symbol,
+                    "Stock signal activated for {Symbol}: id={SignalId}, type={SignalType}, totalScore={Score}.",
+                    stock.Symbol,
                     signal.Id,
                     signalType,
                     scoreResult.TotalScore);
@@ -196,8 +181,8 @@ public sealed class SignalScanWorker : BackgroundService
             else
             {
                 _logger.LogWarning(
-                    "Signal remains pending for {Symbol}: id={SignalId}, type={SignalType}, totalScore={Score}.",
-                    coin.Symbol,
+                    "Stock signal remains pending for {Symbol}: id={SignalId}, type={SignalType}, totalScore={Score}.",
+                    stock.Symbol,
                     signal.Id,
                     signalType,
                     scoreResult.TotalScore);
@@ -205,11 +190,10 @@ public sealed class SignalScanWorker : BackgroundService
         }
 
         _logger.LogInformation(
-            "Scan finished. Regime {Regime}. Best score {BestScore} on {BestSymbol}. Candidate threshold {Threshold}.",
-            regimeResult.Regime,
+            "Stock scan finished. Best score {BestScore} on {BestSymbol}. Candidate threshold {Threshold}.",
             bestScore,
             bestSymbol ?? "-",
-            ResolveThresholds(regimeResult.Regime).Candidate);
+            _stockOptions.Candidate);
     }
 
     private async Task<Signal?> ResolveActiveSignalAsync(
@@ -231,15 +215,5 @@ public sealed class SignalScanWorker : BackgroundService
         }
 
         return activeSignal;
-    }
-
-    private (int Candidate, int Strong) ResolveThresholds(MarketRegime regime)
-    {
-        return regime switch
-        {
-            MarketRegime.RiskOn => (_botOptions.ScoreThresholds.RiskOn.Candidate, _botOptions.ScoreThresholds.RiskOn.Strong),
-            MarketRegime.Neutral => (_botOptions.ScoreThresholds.Neutral.Candidate, _botOptions.ScoreThresholds.Neutral.Strong),
-            _ => (int.MaxValue, int.MaxValue)
-        };
     }
 }

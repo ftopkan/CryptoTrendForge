@@ -1,3 +1,4 @@
+using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Core.Infrastructure.Cache;
 using CryptoTrendForge.Core.Infrastructure.Database;
@@ -27,9 +28,19 @@ public sealed class MarketDataService
 
     public async Task<IReadOnlyList<Coin>> GetActiveCoinsAsync(CancellationToken cancellationToken = default)
     {
+        return await ActiveCoins(CoinType.Crypto, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Coin>> GetActiveStocksAsync(CancellationToken cancellationToken = default)
+    {
+        return await ActiveCoins(CoinType.Stock, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<Coin>> ActiveCoins(CoinType coinType, CancellationToken cancellationToken)
+    {
         return await _dbContext.Coins
             .AsNoTracking()
-            .Where(x => x.IsActive)
+            .Where(x => x.IsActive && x.CoinType == coinType)
             .OrderBy(x => x.Symbol)
             .ToListAsync(cancellationToken);
     }

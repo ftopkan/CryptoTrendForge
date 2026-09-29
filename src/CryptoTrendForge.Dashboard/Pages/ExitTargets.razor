@@ -71,7 +71,7 @@ else
                     {
                         <tr>
                             <td class="text-nowrap">@row.CreatedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
-                            <td><a class="fw-semibold" href="/signals/@row.Id">@row.Symbol</a></td>
+                            <td><a class="fw-semibold" href="/signals/@row.Id">@row.Symbol</a> <span class="badge text-bg-secondary">@(row.CoinType == CoinType.Stock ? "Hisse" : "Kripto")</span></td>
                             <td class="font-monospace">@FormatPrice(row.EntryPrice)</td>
                             <td class="font-monospace">@FormatPrice(row.StopPrice)</td>
                             <td><TargetCell Price="@row.CautiousExit" Minutes="@row.CautiousMinutes" ClosedAt="@row.TargetsClosedAt" /></td>
