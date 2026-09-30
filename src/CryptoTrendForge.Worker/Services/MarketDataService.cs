@@ -47,7 +47,8 @@ public sealed class MarketDataService
         string symbol,
         CancellationToken cancellationToken = default)
     {
-        return LoadSnapshotAsync(symbol, fourHourLimit: 200, cancellationToken);
+        // EMA200 needs 200 closed bars. Bybit includes the open 4h candle, so request one extra.
+        return LoadSnapshotAsync(symbol, fourHourLimit: 201, cancellationToken);
     }
 
     public Task<MarketSnapshot?> GetStockMarketSnapshotAsync(

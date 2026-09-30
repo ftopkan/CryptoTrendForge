@@ -1,3 +1,4 @@
+using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Worker.Configuration;
@@ -62,6 +63,43 @@ public sealed class SignalEngineTests
 
         Assert.Equal(5, result.PatternBonus);
         Assert.Equal("Dipten seken çekiç mum", result.PatternName);
+    }
+
+    [Fact]
+    public void CalculateScore_KeepsTheTrendScoreAfterTheOpenFourHourCandleIsDropped()
+    {
+        var options = Options.Create(new BotOptions());
+        var engine = new SignalEngine(new TechnicalAnalysisService(), options);
+        var now = DateTimeOffset.UtcNow;
+        var open = CandleClock.Floor(now, TimeSpan.FromHours(4));
+        var klines = new List<Kline>(201);
+        var price = 100m;
+        for (var i = 200; i >= 0; i--)
+        {
+            var close = price;
+            klines.Add(new Kline
+            {
+                OpenTime = open.AddHours(-4 * i),
+                Open = close - 0.05m,
+                High = close + 0.1m,
+                Low = close - 0.1m,
+                Close = close,
+                Volume = 1000m
+            });
+            price += 0.2m;
+        }
+
+        var result = engine.CalculateScore(
+            new MarketSnapshot
+            {
+                Symbol = "TESTUSDT",
+                CurrentPrice = klines[^2].Close,
+                Klines4H = klines
+            },
+            MarketRegime.Neutral,
+            now);
+
+        Assert.Equal(25, result.Breakdown["trend"]);
     }
 
     [Fact]
