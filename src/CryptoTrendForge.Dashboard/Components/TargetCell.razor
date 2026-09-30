@@ -1,21 +1,25 @@
-<div class="font-monospace small">@PriceText</div>
+@if (!BadgeOnly)
+{
+    <div class="font-monospace small">@PriceText</div>
+}
 @if (Minutes is not null)
 {
-    <span class="badge text-bg-success">@Minutes min</span>
+    <span class="badge text-bg-success">@Minutes dk</span>
 }
 else if (ClosedAt is null)
 {
-    <span class="badge text-bg-warning">watching</span>
+    <span class="badge text-bg-warning">İzleniyor</span>
 }
 else
 {
-    <span class="badge text-bg-secondary">not reached</span>
+    <span class="badge text-bg-secondary">Gelmedi</span>
 }
 
 @code {
     [Parameter] public decimal? Price { get; set; }
     [Parameter] public int? Minutes { get; set; }
     [Parameter] public DateTimeOffset? ClosedAt { get; set; }
+    [Parameter] public bool BadgeOnly { get; set; }
 
     private string PriceText => Price?.ToString("0.########") ?? "—";
 }

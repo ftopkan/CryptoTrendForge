@@ -2,13 +2,14 @@
 @inject DashboardDataService DataService
 @inject DashboardSession Session
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">Exit targets</h1>
+<div class="mb-3">
+    <h1 class="h3 mb-0">Çıkışlar</h1>
+    <p class="page-lead text-secondary mb-0">Giriş, stop ve hedefler. Saat Türkiye saatidir.</p>
 </div>
 
 @if (!Session.IsAuthenticated)
 {
-    <div class="alert alert-secondary">You must log in first. <a href="/login">Go to login</a></div>
+    <div class="alert alert-secondary">Önce giriş yap. <a href="/login">Giriş</a></div>
 }
 else
 {
@@ -16,15 +17,15 @@ else
         <div class="card-body">
             <div class="row g-2 align-items-end">
                 <div class="col-md-3">
-                    <label class="form-label">From</label>
+                    <label class="form-label">Başlangıç</label>
                     <input class="form-control" type="date" @bind="fromDate" @bind:format="yyyy-MM-dd" />
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">To</label>
+                    <label class="form-label">Bitiş</label>
                     <input class="form-control" type="date" @bind="toDate" @bind:format="yyyy-MM-dd" />
                 </div>
                 <div class="col-md-2">
-                    <button class="btn btn-primary" @onclick="Load">Filter</button>
+                    <button class="btn btn-primary" @onclick="Load">Uygula</button>
                 </div>
             </div>
         </div>
@@ -32,47 +33,47 @@ else
 
     <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3">
-            <div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Signals</div><div class="stat-value">@rows.Count</div></div></div>
+            <div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Sinyal</div><div class="stat-value">@rows.Count</div></div></div>
         </div>
         <div class="col-6 col-lg-3">
-            <div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Closed plans</div><div class="stat-value">@closedCount</div></div></div>
+            <div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Kapanan plan</div><div class="stat-value">@closedCount</div></div></div>
         </div>
         <div class="col-lg-6">
             <div class="card border-secondary-subtle h-100">
                 <div class="card-body">
-                    <RateBar Label="Cautious" Percent="@cautiousRate" Value="@($"{cautiousRate}%")" />
-                    <RateBar Label="Balanced" Percent="@balancedRate" Value="@($"{balancedRate}%")" />
-                    <RateBar Label="Wide" Percent="@wideRate" Value="@($"{wideRate}%")" />
+                    <RateBar Label="Temkinli" Percent="@cautiousRate" Value="@($"{cautiousRate}%")" />
+                    <RateBar Label="Dengeli" Percent="@balancedRate" Value="@($"{balancedRate}%")" />
+                    <RateBar Label="Geniş" Percent="@wideRate" Value="@($"{wideRate}%")" />
                 </div>
             </div>
         </div>
     </div>
 
     <div class="card border-secondary-subtle">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+        <div class="table-panel">
+            <table class="table table-hover align-middle mb-0 data-table">
                 <thead>
                     <tr>
-                        <th>Time (UTC)</th>
-                        <th>Symbol</th>
-                        <th>Entry</th>
+                        <th>Saat (TSİ)</th>
+                        <th>Sembol</th>
+                        <th class="num">Giriş</th>
                         <th>Stop</th>
-                        <th>Cautious</th>
-                        <th>Balanced</th>
-                        <th>Wide</th>
+                        <th>Temkinli</th>
+                        <th>Dengeli</th>
+                        <th>Geniş</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if (rows.Count == 0)
                     {
-                        <tr><td colspan="7" class="text-secondary">No signals with an exit plan in this date range.</td></tr>
+                        <tr class="empty-row"><td colspan="7" class="text-secondary">Bu aralıkta çıkış planı olan sinyal yok.</td></tr>
                     }
                     @foreach (var row in rows)
                     {
                         <tr>
-                            <td class="text-nowrap">@row.CreatedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
-                            <td><a class="fw-semibold" href="/signals/@row.Id">@row.Symbol</a> <span class="badge text-bg-secondary">@(row.CoinType == CoinType.Stock ? "Hisse" : "Kripto")</span></td>
-                            <td class="font-monospace">@FormatPrice(row.EntryPrice)</td>
+                            <td class="text-nowrap">@DisplayText.TurkeyTime(row.CreatedAt)</td>
+                            <td><a class="fw-semibold" href="/signals/@row.Id">@row.Symbol</a> <span class="badge text-bg-secondary ms-1">@(row.CoinType == CoinType.Stock ? "Hisse" : "Kripto")</span></td>
+                            <td class="num font-monospace">@FormatPrice(row.EntryPrice)</td>
                             <td><TargetCell Price="@row.StopPrice" Minutes="@row.StopMinutes" ClosedAt="@row.TargetsClosedAt" /></td>
                             <td><TargetCell Price="@row.CautiousExit" Minutes="@row.CautiousMinutes" ClosedAt="@row.TargetsClosedAt" /></td>
                             <td><TargetCell Price="@row.BalancedExit" Minutes="@row.BalancedMinutes" ClosedAt="@row.TargetsClosedAt" /></td>

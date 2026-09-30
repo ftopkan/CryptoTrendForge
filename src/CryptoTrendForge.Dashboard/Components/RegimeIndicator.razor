@@ -1,14 +1,14 @@
 @if (Regime == MarketRegime.RiskOn)
 {
-    <span class="badge text-bg-success">Risk on</span>
+    <span class="badge text-bg-success">@DisplayText.Regime(MarketRegime.RiskOn)</span>
 }
 else if (Regime == MarketRegime.RiskOff)
 {
-    <span class="badge text-bg-danger">Risk off</span>
+    <span class="badge text-bg-danger">@DisplayText.Regime(MarketRegime.RiskOff)</span>
 }
 else
 {
-    <span class="badge text-bg-warning">Neutral</span>
+    <span class="badge text-bg-warning">@DisplayText.Regime(MarketRegime.Neutral)</span>
 }
 
 @code {

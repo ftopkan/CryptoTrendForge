@@ -1,9 +1,9 @@
 <div class="card border-secondary-subtle">
-    <div class="card-header">Price after the signal</div>
+    <div class="card-header">Sinyalden sonraki fiyat</div>
     <div class="card-body">
         @if (Outcomes.Count == 0)
         {
-            <p class="text-secondary mb-0">No outcomes captured yet.</p>
+            <p class="text-secondary mb-0">Henüz fiyat kaydı yok.</p>
         }
         else
         {
@@ -18,13 +18,13 @@
                 }
             </svg>
             <div class="table-responsive mt-3">
-                <table class="table table-sm table-hover align-middle mb-0">
+                <table class="table table-sm table-hover align-middle mb-0 data-table">
                     <thead>
                         <tr>
-                            <th>Minutes</th>
-                            <th>Price</th>
-                            <th>Change</th>
-                            <th>Snapshot UTC</th>
+                            <th>Dakika</th>
+                            <th class="num">Fiyat</th>
+                            <th class="num">Değişim</th>
+                            <th>Saat (TSİ)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -32,9 +32,9 @@
                         {
                             <tr>
                                 <td>@item.MinutesElapsed</td>
-                                <td class="font-monospace">@item.PriceAt.ToString("0.########")</td>
-                                <td class="@(item.PriceChangePct >= 0 ? "text-success" : "text-danger")">@item.PriceChangePct.ToString("+0.##;-0.##;0")%</td>
-                                <td>@item.SnapshotAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td class="num font-monospace">@item.PriceAt.ToString("0.########")</td>
+                                <td class="num @(item.PriceChangePct >= 0 ? "text-success" : "text-danger")">@item.PriceChangePct.ToString("+0.##;-0.##;0")%</td>
+                                <td>@DisplayText.TurkeyTime(item.SnapshotAt)</td>
                             </tr>
                         }
                     </tbody>

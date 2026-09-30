@@ -1,3 +1,56 @@
+.page-lead {
+    margin-top: 0.2rem;
+}
+
+.form-control::placeholder {
+    color: var(--bs-secondary-color);
+    opacity: 1;
+}
+
+.table-panel {
+    max-height: 70vh;
+    overflow: auto;
+}
+
+.data-table {
+    --bs-table-hover-bg: rgba(56, 189, 248, 0.08);
+}
+
+.data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bs-body-bg);
+    box-shadow: inset 0 -1px 0 var(--bs-border-color);
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+    white-space: nowrap;
+}
+
+.data-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.data-table .empty-row td {
+    padding: 2.5rem 1rem;
+    text-align: center;
+}
+
+.rate-label {
+    width: 9rem;
+    flex: none;
+}
+
+.rate-value {
+    width: 6.5rem;
+    flex: none;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
 .chart-track {
     height: 0.55rem;
     background: rgba(148, 163, 184, 0.2);

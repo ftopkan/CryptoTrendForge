@@ -2,13 +2,14 @@
 @inject DashboardDataService DataService
 @inject DashboardSession Session
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">Signals</h1>
+<div class="mb-3">
+    <h1 class="h3 mb-0">Sinyaller</h1>
+    <p class="page-lead text-secondary mb-0">Long adayları. Saat Türkiye saatidir.</p>
 </div>
 
 @if (!Session.IsAuthenticated)
 {
-    <div class="alert alert-secondary">You must log in first. <a href="/login">Go to login</a></div>
+    <div class="alert alert-secondary">Önce giriş yap. <a href="/login">Giriş</a></div>
 }
 else
 {
@@ -16,87 +17,86 @@ else
         <div class="card-body">
             <div class="row g-2 align-items-end">
                 <div class="col-md-3">
-                    <label class="form-label">Symbol</label>
+                    <label class="form-label">Sembol</label>
                     <input class="form-control" placeholder="XRPUSDT" @bind="filter.Symbol" />
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label">Min score</label>
+                    <label class="form-label">En düşük skor</label>
                     <input class="form-control" type="number" @bind="minScoreInput" />
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label">Status</label>
+                    <label class="form-label">Durum</label>
                     <select class="form-select" @bind="statusText">
-                        <option value="">All</option>
+                        <option value="">Tümü</option>
                         @foreach (var status in Enum.GetValues<SignalStatus>())
                         {
-                            <option value="@status">@status</option>
+                            <option value="@status">@DisplayText.Status(status)</option>
                         }
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label">Asset</label>
+                    <label class="form-label">Varlık</label>
                     <select class="form-select" @bind="coinTypeText">
-                        <option value="">All</option>
-                        <option value="@CoinType.Crypto">Crypto</option>
-                        <option value="@CoinType.Stock">Stock</option>
+                        <option value="">Tümü</option>
+                        <option value="@CoinType.Crypto">Kripto</option>
+                        <option value="@CoinType.Stock">Hisse</option>
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label">Regime</label>
+                    <label class="form-label">Rejim</label>
                     <select class="form-select" @bind="regimeText">
-                        <option value="">All</option>
+                        <option value="">Tümü</option>
                         @foreach (var regime in Enum.GetValues<MarketRegime>())
                         {
-                            <option value="@regime">@regime</option>
+                            <option value="@regime">@DisplayText.Regime(regime)</option>
                         }
                     </select>
                 </div>
-                <div class="col-md-2">
-                    <div class="form-check mb-2">
+                <div class="col-12 col-lg-auto d-flex flex-wrap align-items-center gap-3">
+                    <div class="form-check mb-0">
                         <input class="form-check-input" type="checkbox" id="patternOnly" @bind="filter.PatternBonusOnly" />
-                        <label class="form-check-label" for="patternOnly">Pattern bonus</label>
+                        <label class="form-check-label text-nowrap" for="patternOnly">Mum bonusu olanlar</label>
                     </div>
-                </div>
-                <div class="col-md-1">
-                    <button class="btn btn-primary w-100" @onclick="Load">Filter</button>
+                    <button class="btn btn-primary text-nowrap" @onclick="Load">Uygula</button>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="card border-secondary-subtle">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+        <div class="table-panel">
+            <table class="table table-hover align-middle mb-0 data-table">
                 <thead>
                     <tr>
-                        <th>Id</th>
-                        <th>Symbol</th>
-                        <th>Total</th>
-                        <th>Base</th>
-                        <th>Pattern</th>
-                        <th>Status</th>
-                        <th>Regime</th>
-                        <th>Type</th>
-                        <th>Time (UTC)</th>
+                        <th>Sembol</th>
+                        <th class="num">Skor</th>
+                        <th class="num">Temel</th>
+                        <th class="num">Mum</th>
+                        <th>Durum</th>
+                        <th>Rejim</th>
+                        <th>Tür</th>
+                        <th>Saat (TSİ)</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if (signals.Count == 0)
                     {
-                        <tr><td colspan="9" class="text-secondary">No signals match this filter.</td></tr>
+                        <tr class="empty-row"><td colspan="8" class="text-secondary">Bu filtreye uyan sinyal yok.</td></tr>
                     }
                     @foreach (var item in signals)
                     {
                         <tr>
-                            <td><a href="/signals/@item.Id">@item.Id</a></td>
-                            <td class="fw-semibold">@item.Symbol <span class="badge text-bg-secondary">@(item.CoinType == CoinType.Stock ? "Hisse" : "Kripto")</span></td>
-                            <td>@item.TotalScore</td>
-                            <td>@item.BaseScore</td>
-                            <td>@item.PatternBonus</td>
-                            <td><span class="badge text-bg-dark">@item.Status</span></td>
+                            <td>
+                                <a class="fw-semibold" href="/signals/@item.Id">@item.Symbol</a>
+                                <span class="badge text-bg-secondary ms-1">@(item.CoinType == CoinType.Stock ? "Hisse" : "Kripto")</span>
+                            </td>
+                            <td class="num fw-semibold">@item.TotalScore</td>
+                            <td class="num">@item.BaseScore</td>
+                            <td class="num">@item.PatternBonus</td>
+                            <td><span class="badge @DisplayText.StatusBadge(item.Status)">@DisplayText.Status(item.Status)</span></td>
                             <td>@if (item.CoinType == CoinType.Stock) { <span class="text-secondary">—</span> } else { <RegimeIndicator Regime="@item.Regime" /> }</td>
-                            <td>@item.SignalType</td>
-                            <td class="text-nowrap">@item.CreatedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@DisplayText.LongKind(item.SignalType)</td>
+                            <td class="text-nowrap">@DisplayText.TurkeyTime(item.CreatedAt)</td>
                         </tr>
                     }
                 </tbody>

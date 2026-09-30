@@ -1,24 +1,36 @@
 <div class="card border-secondary-subtle h-100">
-    <div class="card-header">Score breakdown</div>
+    <div class="card-header">Skor dağılımı</div>
     <div class="card-body">
         @if (Breakdown.Count == 0)
         {
-            <p class="text-secondary mb-0">No score breakdown available.</p>
+            <p class="text-secondary mb-0">Skor dağılımı yok.</p>
         }
         else
         {
-            @foreach (var item in Breakdown.OrderBy(x => x.Key))
+            @foreach (var item in Ordered())
             {
                 var max = MaxFor(item.Key);
                 var percent = max == 0 ? 0m : Math.Clamp(item.Value * 100m / max, -100m, 100m);
-                <RateBar Label="@item.Key" Percent="@percent" Negative="@(item.Value < 0)" Value="@($"{item.Value}/{max}")" />
+                <RateBar Label="@DisplayText.Breakdown(item.Key)" Percent="@percent" Negative="@(item.Value < 0)" Value="@($"{item.Value}/{max}")" />
             }
         }
     </div>
 </div>
 
 @code {
+    private static readonly string[] ScoreOrder = ["trend", "rsi", "volume", "support", "oi", "pattern_bonus"];
+
     [Parameter] public Dictionary<string, int> Breakdown { get; set; } = new();
+
+    private IEnumerable<KeyValuePair<string, int>> Ordered()
+    {
+        return Breakdown
+            .OrderBy(item =>
+            {
+                var index = Array.IndexOf(ScoreOrder, item.Key);
+                return index < 0 ? ScoreOrder.Length : index;
+            });
+    }
 
     private static int MaxFor(string key)
     {
@@ -27,7 +39,7 @@
             "trend" => 25,
             "rsi" or "volume" or "support" => 20,
             "oi" => 15,
-            "pattern_bonus" => 10,
+            "pattern_bonus" => 5,
             _ => Math.Max(1, 25)
         };
     }

@@ -2,60 +2,62 @@
 @inject DashboardDataService DataService
 @inject DashboardSession Session
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">Performance</h1>
+<div class="mb-3">
+    <h1 class="h3 mb-0">Performans</h1>
+    <p class="page-lead text-secondary mb-0">Kapanmış sinyallerin hedefe ulaşıp ulaşmadığı.</p>
 </div>
 
 @if (!Session.IsAuthenticated)
 {
-    <div class="alert alert-secondary">You must log in first. <a href="/login">Go to login</a></div>
+    <div class="alert alert-secondary">Önce giriş yap. <a href="/login">Giriş</a></div>
 }
 else if (snapshot is null)
 {
-    <p class="text-secondary">Loading...</p>
+    <p class="text-secondary">Yükleniyor...</p>
 }
 else
 {
     <div class="row g-3 mb-3">
-        <div class="col-6 col-lg-3"><div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Signals at 1h</div><div class="stat-value">@snapshot.TotalSignalsAt1H</div></div></div></div>
-        <div class="col-6 col-lg-3"><div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Success rate</div><div class="stat-value">@snapshot.OverallSuccessRatePct%</div></div></div></div>
-        <div class="col-6 col-lg-3"><div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Avg change 1h</div><div class="stat-value @(snapshot.AvgChange1HPct >= 0 ? "text-success" : "text-danger")">@snapshot.AvgChange1HPct.ToString("+0.##;-0.##;0")%</div></div></div></div>
-        <div class="col-6 col-lg-3"><div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Avg change 4h</div><div class="stat-value @(snapshot.AvgChange4HPct >= 0 ? "text-success" : "text-danger")">@snapshot.AvgChange4HPct.ToString("+0.##;-0.##;0")%</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">1 saatlik sinyal</div><div class="stat-value">@snapshot.TotalSignalsAt1H</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Başarı oranı</div><div class="stat-value">@snapshot.OverallSuccessRatePct%</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Ort. değişim 1s</div><div class="stat-value @(snapshot.AvgChange1HPct >= 0 ? "text-success" : "text-danger")">@snapshot.AvgChange1HPct.ToString("+0.##;-0.##;0")%</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card border-secondary-subtle h-100"><div class="card-body"><div class="text-secondary small">Ort. değişim 4s</div><div class="stat-value @(snapshot.AvgChange4HPct >= 0 ? "text-success" : "text-danger")">@snapshot.AvgChange4HPct.ToString("+0.##;-0.##;0")%</div></div></div></div>
     </div>
 
     <div class="row g-3 mb-3">
         <div class="col-lg-6">
             <div class="card border-secondary-subtle h-100">
-                <div class="card-header">Exit target hit rate</div>
+                <div class="card-header">Hedefe ulaşma</div>
                 <div class="card-body">
-                    <p class="text-secondary small">Closed plans: @snapshot.ExitTargets.ClosedSignals</p>
-                    <RateBar Label="Cautious" Percent="@snapshot.ExitTargets.CautiousHitRatePct" Value="@($"{snapshot.ExitTargets.CautiousHitRatePct}%")" />
-                    <RateBar Label="Balanced" Percent="@snapshot.ExitTargets.BalancedHitRatePct" Value="@($"{snapshot.ExitTargets.BalancedHitRatePct}%")" />
-                    <RateBar Label="Wide" Percent="@snapshot.ExitTargets.WideHitRatePct" Value="@($"{snapshot.ExitTargets.WideHitRatePct}%")" />
-                    <p class="text-secondary small mt-3 mb-1">Crypto closed plans: @snapshot.CryptoExitTargets.ClosedSignals</p>
-                    <RateBar Label="Crypto cautious" Percent="@snapshot.CryptoExitTargets.CautiousHitRatePct" Value="@($"{snapshot.CryptoExitTargets.CautiousHitRatePct}%")" />
-                    <RateBar Label="Crypto balanced" Percent="@snapshot.CryptoExitTargets.BalancedHitRatePct" Value="@($"{snapshot.CryptoExitTargets.BalancedHitRatePct}%")" />
-                    <RateBar Label="Crypto wide" Percent="@snapshot.CryptoExitTargets.WideHitRatePct" Value="@($"{snapshot.CryptoExitTargets.WideHitRatePct}%")" />
-                    <p class="text-secondary small mt-3 mb-1">Stock closed plans: @snapshot.StockExitTargets.ClosedSignals</p>
-                    <RateBar Label="Stock cautious" Percent="@snapshot.StockExitTargets.CautiousHitRatePct" Value="@($"{snapshot.StockExitTargets.CautiousHitRatePct}%")" />
-                    <RateBar Label="Stock balanced" Percent="@snapshot.StockExitTargets.BalancedHitRatePct" Value="@($"{snapshot.StockExitTargets.BalancedHitRatePct}%")" />
-                    <RateBar Label="Stock wide" Percent="@snapshot.StockExitTargets.WideHitRatePct" Value="@($"{snapshot.StockExitTargets.WideHitRatePct}%")" />
-                    <RateBar Label="With pattern" Percent="@snapshot.PatternWithSuccessRate" Value="@($"{snapshot.PatternWithSuccessRate}%")" />
-                    <RateBar Label="No pattern" Percent="@snapshot.PatternWithoutSuccessRate" Value="@($"{snapshot.PatternWithoutSuccessRate}%")" />
+                    <p class="text-secondary small mb-2">Tümü · kapanan plan @snapshot.ExitTargets.ClosedSignals</p>
+                    <RateBar Label="Temkinli" Percent="@snapshot.ExitTargets.CautiousHitRatePct" Value="@($"{snapshot.ExitTargets.CautiousHitRatePct}%")" />
+                    <RateBar Label="Dengeli" Percent="@snapshot.ExitTargets.BalancedHitRatePct" Value="@($"{snapshot.ExitTargets.BalancedHitRatePct}%")" />
+                    <RateBar Label="Geniş" Percent="@snapshot.ExitTargets.WideHitRatePct" Value="@($"{snapshot.ExitTargets.WideHitRatePct}%")" />
+                    <p class="text-secondary small mt-3 mb-2">Kripto · kapanan plan @snapshot.CryptoExitTargets.ClosedSignals</p>
+                    <RateBar Label="Temkinli" Percent="@snapshot.CryptoExitTargets.CautiousHitRatePct" Value="@($"{snapshot.CryptoExitTargets.CautiousHitRatePct}%")" />
+                    <RateBar Label="Dengeli" Percent="@snapshot.CryptoExitTargets.BalancedHitRatePct" Value="@($"{snapshot.CryptoExitTargets.BalancedHitRatePct}%")" />
+                    <RateBar Label="Geniş" Percent="@snapshot.CryptoExitTargets.WideHitRatePct" Value="@($"{snapshot.CryptoExitTargets.WideHitRatePct}%")" />
+                    <p class="text-secondary small mt-3 mb-2">Hisse · kapanan plan @snapshot.StockExitTargets.ClosedSignals</p>
+                    <RateBar Label="Temkinli" Percent="@snapshot.StockExitTargets.CautiousHitRatePct" Value="@($"{snapshot.StockExitTargets.CautiousHitRatePct}%")" />
+                    <RateBar Label="Dengeli" Percent="@snapshot.StockExitTargets.BalancedHitRatePct" Value="@($"{snapshot.StockExitTargets.BalancedHitRatePct}%")" />
+                    <RateBar Label="Geniş" Percent="@snapshot.StockExitTargets.WideHitRatePct" Value="@($"{snapshot.StockExitTargets.WideHitRatePct}%")" />
+                    <p class="text-secondary small mt-3 mb-2">Mum yapısı</p>
+                    <RateBar Label="Mum var" Percent="@snapshot.PatternWithSuccessRate" Value="@($"{snapshot.PatternWithSuccessRate}%")" />
+                    <RateBar Label="Mum yok" Percent="@snapshot.PatternWithoutSuccessRate" Value="@($"{snapshot.PatternWithoutSuccessRate}%")" />
                 </div>
             </div>
         </div>
         <div class="col-lg-6">
             <div class="card border-secondary-subtle h-100">
-                <div class="card-header">By regime</div>
+                <div class="card-header">Bitcoin rejimine göre</div>
                 <div class="card-body">
                     @if (snapshot.RegimeBuckets.Count == 0)
                     {
-                        <p class="text-secondary mb-0">No closed 1h outcomes yet.</p>
+                        <p class="text-secondary mb-0">Henüz kapanmış 1 saatlik sonuç yok.</p>
                     }
                     @foreach (var bucket in snapshot.RegimeBuckets)
                     {
-                        <RateBar Label="@bucket.Key" Percent="@bucket.SuccessRatePct" Value="@($"{bucket.SuccessRatePct}% · {bucket.Total}")" />
+                        <RateBar Label="@RegimeLabel(bucket.Key)" Percent="@bucket.SuccessRatePct" Value="@($"{bucket.SuccessRatePct}% · {bucket.Total}")" />
                     }
                 </div>
             </div>
@@ -63,11 +65,11 @@ else
     </div>
 
     <div class="card border-secondary-subtle">
-        <div class="card-header">By coin</div>
+        <div class="card-header">Sembole göre</div>
         <div class="card-body">
             @if (snapshot.CoinBuckets.Count == 0)
             {
-                <p class="text-secondary mb-0">No closed 1h outcomes yet.</p>
+                <p class="text-secondary mb-0">Henüz kapanmış 1 saatlik sonuç yok.</p>
             }
             @foreach (var bucket in snapshot.CoinBuckets)
             {
@@ -79,6 +81,11 @@ else
 
 @code {
     private PerformanceSnapshot? snapshot;
+
+    private static string RegimeLabel(string key)
+    {
+        return Enum.TryParse<MarketRegime>(key, out var regime) ? DisplayText.Regime(regime) : key;
+    }
 
     protected override async Task OnInitializedAsync()
     {

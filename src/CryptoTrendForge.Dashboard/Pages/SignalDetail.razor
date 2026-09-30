@@ -4,38 +4,38 @@
 
 @if (!Session.IsAuthenticated)
 {
-    <div class="alert alert-secondary">You must log in first. <a href="/login">Go to login</a></div>
+    <div class="alert alert-secondary">Önce giriş yap. <a href="/login">Giriş</a></div>
 }
 else if (detail is null)
 {
-    <div class="alert alert-warning">Signal not found.</div>
+    <div class="alert alert-warning">Sinyal bulunamadı.</div>
 }
 else
 {
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1 class="h3 mb-0">@detail.Symbol <span class="badge text-bg-secondary">@(detail.CoinType == CoinType.Stock ? "Hisse" : "Kripto")</span> <span class="text-secondary">#@detail.Id</span></h1>
-        <a class="btn btn-outline-secondary btn-sm" href="/signals">Back</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/signals">Listeye dön</a>
     </div>
 
     <div class="row g-3 mb-3">
         <div class="col-lg-4">
             <div class="card border-secondary-subtle h-100">
-                <div class="card-header">Signal</div>
+                <div class="card-header">Sinyal</div>
                 <ul class="list-group list-group-flush">
-                    <li class="list-group-item d-flex justify-content-between"><span>Type</span><span>@detail.SignalType</span></li>
-                    <li class="list-group-item d-flex justify-content-between"><span>Status</span><span class="badge text-bg-dark">@detail.Status</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Tür</span><span>@DisplayText.LongKind(detail.SignalType)</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Durum</span><span class="badge @DisplayText.StatusBadge(detail.Status)">@DisplayText.Status(detail.Status)</span></li>
                     @if (detail.CoinType == CoinType.Stock)
                     {
-                        <li class="list-group-item d-flex justify-content-between"><span>Market</span><span>NYSE</span></li>
+                        <li class="list-group-item d-flex justify-content-between"><span>Piyasa</span><span>NYSE</span></li>
                     }
                     else
                     {
-                        <li class="list-group-item d-flex justify-content-between"><span>Regime</span><RegimeIndicator Regime="@detail.Regime" /></li>
+                        <li class="list-group-item d-flex justify-content-between"><span>Rejim</span><RegimeIndicator Regime="@detail.Regime" /></li>
                     }
-                    <li class="list-group-item d-flex justify-content-between"><span>Total</span><span>@detail.TotalScore</span></li>
-                    <li class="list-group-item d-flex justify-content-between"><span>Base / pattern</span><span>@detail.BaseScore / @detail.PatternBonus</span></li>
-                    <li class="list-group-item d-flex justify-content-between"><span>Support</span><span class="font-monospace">@detail.SupportLevel</span></li>
-                    <li class="list-group-item d-flex justify-content-between"><span>Distance</span><span>@detail.SupportDistPct%</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Toplam</span><span class="fw-semibold">@detail.TotalScore</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Temel / mum</span><span>@detail.BaseScore / @detail.PatternBonus</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Destek</span><span class="font-monospace">@detail.SupportLevel</span></li>
+                    <li class="list-group-item d-flex justify-content-between"><span>Uzaklık</span><span>@detail.SupportDistPct%</span></li>
                     <li class="list-group-item d-flex justify-content-between"><span>Funding</span><span>@detail.FundingRate</span></li>
                 </ul>
             </div>
@@ -48,18 +48,18 @@ else
     @if (detail.EntryPrice is not null)
     {
         <div class="card border-secondary-subtle mb-3">
-            <div class="card-header">Exit targets</div>
+            <div class="card-header">Çıkış planı</div>
             <div class="table-responsive">
-                <table class="table align-middle mb-0">
+                <table class="table align-middle mb-0 data-table">
                     <thead>
-                        <tr><th>Level</th><th>Price</th><th>Result</th></tr>
+                        <tr><th>Seviye</th><th>Fiyat</th><th>Sonuç</th></tr>
                     </thead>
                     <tbody>
-                        <tr><td>Entry</td><td class="font-monospace">@detail.EntryPrice</td><td></td></tr>
-                        <tr><td>Stop</td><td colspan="2"><TargetCell Price="@detail.StopPrice" Minutes="@detail.StopMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
-                        <tr><td>Cautious</td><td colspan="2"><TargetCell Price="@detail.CautiousExit" Minutes="@detail.CautiousMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
-                        <tr><td>Balanced</td><td colspan="2"><TargetCell Price="@detail.BalancedExit" Minutes="@detail.BalancedMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
-                        <tr><td>Wide</td><td colspan="2"><TargetCell Price="@detail.WideExit" Minutes="@detail.WideMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
+                        <tr><td>Giriş</td><td class="num font-monospace">@FormatPrice(detail.EntryPrice)</td><td></td></tr>
+                        <tr><td>Stop</td><td class="num font-monospace">@FormatPrice(detail.StopPrice)</td><td><TargetCell BadgeOnly="true" Minutes="@detail.StopMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
+                        <tr><td>Temkinli</td><td class="num font-monospace">@FormatPrice(detail.CautiousExit)</td><td><TargetCell BadgeOnly="true" Minutes="@detail.CautiousMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
+                        <tr><td>Dengeli</td><td class="num font-monospace">@FormatPrice(detail.BalancedExit)</td><td><TargetCell BadgeOnly="true" Minutes="@detail.BalancedMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
+                        <tr><td>Geniş</td><td class="num font-monospace">@FormatPrice(detail.WideExit)</td><td><TargetCell BadgeOnly="true" Minutes="@detail.WideMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
                     </tbody>
                 </table>
             </div>
@@ -73,7 +73,7 @@ else
     <div class="row g-3">
         <div class="col-md-6">
             <div class="card border-secondary-subtle h-100">
-                <div class="card-header">Reasons</div>
+                <div class="card-header">Gerekçeler</div>
                 <ul class="list-group list-group-flush">
                     @foreach (var reason in detail.Reasons)
                     {
@@ -86,7 +86,7 @@ else
         {
             <div class="col-md-6">
                 <div class="card border-secondary-subtle h-100">
-                    <div class="card-header">Risks</div>
+                    <div class="card-header">Riskler</div>
                     <ul class="list-group list-group-flush">
                         @foreach (var risk in detail.Risks)
                         {
@@ -112,5 +112,10 @@ else
         }
 
         detail = await DataService.GetSignalDetailAsync(SignalId);
+    }
+
+    private static string FormatPrice(decimal? value)
+    {
+        return value?.ToString("0.########") ?? "—";
     }
 }
