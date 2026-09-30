@@ -2,6 +2,7 @@ namespace CryptoTrendForge.Core.Domain;
 
 public sealed class PositionPlan
 {
+    private const decimal MarketEntryMaxDistancePct = 1.5m;
     private const decimal CautiousRewardMultiple = 0.5m;
     private const decimal BalancedRewardMultiple = 1m;
     private const decimal WideRewardMultiple = 1.5m;
@@ -23,7 +24,7 @@ public sealed class PositionPlan
         {
             var distancePct = ((currentPrice - supportLevel) / supportLevel) * 100m;
             var pullback = supportLevel * 1.01m;
-            if (distancePct > 3m && pullback < currentPrice)
+            if (distancePct > MarketEntryMaxDistancePct && pullback < currentPrice)
             {
                 entry = pullback;
                 entryNote = "desteğe çekilince";

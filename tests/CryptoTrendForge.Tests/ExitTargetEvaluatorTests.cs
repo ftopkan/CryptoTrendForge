@@ -22,6 +22,16 @@ public sealed class ExitTargetEvaluatorTests
     }
 
     [Fact]
+    public void Create_WaitsForPullbackOutsideTheTightSupportBand()
+    {
+        var plan = PositionPlan.Create(103m, 100m);
+
+        Assert.Equal(101m, plan.Entry);
+        Assert.Equal("desteğe çekilince", plan.EntryNote);
+        Assert.Equal(97m, plan.Stop);
+    }
+
+    [Fact]
     public void Apply_RecordsFirstTouchInsideTheFourHourWindow()
     {
         var signal = NewSignal();

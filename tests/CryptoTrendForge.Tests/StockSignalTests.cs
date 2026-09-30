@@ -111,17 +111,50 @@ public sealed class StockSignalTests
     public void Engine_ScoresSessionVolumeWithoutBitcoin()
     {
         var engine = CreateEngine();
+        var asOf = new DateTimeOffset(2026, 9, 30, 15, 30, 0, TimeSpan.Zero);
+        var hourly = new[]
+        {
+            new DateTimeOffset(2026, 9, 28, 17, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 9, 28, 18, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 9, 28, 19, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 9, 29, 14, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 9, 29, 15, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 9, 29, 16, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 9, 29, 17, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 9, 29, 18, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 9, 29, 19, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 9, 30, 14, 0, 0, TimeSpan.Zero)
+        }.Select(open => new Kline
+        {
+            OpenTime = open,
+            Open = 99m,
+            High = 101m,
+            Low = 98m,
+            Close = 100m,
+            Volume = 100m
+        }).ToArray();
+        var quarterHours = new[]
+        {
+            new DateTimeOffset(2026, 9, 30, 15, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 9, 30, 15, 15, 0, TimeSpan.Zero)
+        }.Select(open => new Kline
+        {
+            OpenTime = open,
+            Open = 100m,
+            High = 111m,
+            Low = 99m,
+            Close = 110m,
+            Volume = 60m
+        }).ToArray();
         var snapshot = new MarketSnapshot
         {
             Symbol = "SNDKUSDT",
-            CurrentPrice = 100m,
-            Klines1H = SessionCandles(
-                new DateTimeOffset(2026, 9, 29, 0, 0, 0, TimeSpan.Zero),
-                new DateTimeOffset(2026, 9, 30, 0, 0, 0, TimeSpan.Zero),
-                new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero))
+            CurrentPrice = 110m,
+            Klines1H = hourly,
+            Klines15M = quarterHours
         };
 
-        var score = engine.CalculateScore(snapshot);
+        var score = engine.CalculateScore(snapshot, asOf);
 
         Assert.Equal(20, score.Breakdown["volume"]);
         Assert.DoesNotContain(score.Risks, risk => risk.Contains("Bitcoin", StringComparison.Ordinal));
@@ -189,8 +222,9 @@ public sealed class StockSignalTests
             ]
         };
 
+        var sessionClosedAt = new DateTimeOffset(2026, 9, 30, 20, 5, 0, TimeSpan.Zero);
         Assert.Equal(0, engine.CalculateScore(overnight).PatternBonus);
-        Assert.Equal(10, engine.CalculateScore(session).PatternBonus);
+        Assert.Equal(5, engine.CalculateScore(session, sessionClosedAt).PatternBonus);
     }
 
     [Fact]

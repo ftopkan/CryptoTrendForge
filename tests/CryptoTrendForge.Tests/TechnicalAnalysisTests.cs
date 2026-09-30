@@ -1,4 +1,5 @@
 using CryptoTrendForge.Core.Domain;
+using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Worker.Services;
 using Xunit;
@@ -126,6 +127,96 @@ public sealed class TechnicalAnalysisTests
         Assert.False(NearMissRule.ShouldRecord(70, 70, blocked: false));
         Assert.True(NearMissRule.ShouldRecord(72, 70, blocked: true));
         Assert.False(NearMissRule.ShouldRecord(40, int.MaxValue, blocked: false));
+    }
+
+    [Fact]
+    public void AssessHourVolumePace_ScoresBuyingWhenTheHourHasAlreadyBeatenItsShare()
+    {
+        var now = new DateTimeOffset(2026, 9, 30, 10, 30, 0, TimeSpan.Zero);
+        var pace = _service.AssessHourVolumePace(
+            Hourly(now, volume: 100m, close: 100m),
+            QuarterHours(now, 30m, 30m),
+            currentPrice: 110m,
+            baselineCandles: 10,
+            now);
+
+        Assert.True(pace.IsReady);
+        Assert.Equal(VolumeSentiment.StrongBuying, pace.Sentiment);
+    }
+
+    [Fact]
+    public void AssessHourVolumePace_DoesNotProjectAShortBurstIntoAFullHour()
+    {
+        var now = new DateTimeOffset(2026, 9, 30, 10, 30, 0, TimeSpan.Zero);
+        var pace = _service.AssessHourVolumePace(
+            Hourly(now, volume: 100m, close: 100m),
+            QuarterHours(now, 20m, 20m),
+            currentPrice: 110m,
+            baselineCandles: 10,
+            now);
+
+        Assert.True(pace.IsReady);
+        Assert.Equal(VolumeSentiment.WeakMove, pace.Sentiment);
+    }
+
+    [Fact]
+    public void AssessHourVolumePace_WaitsForTwoClosedQuarterHours()
+    {
+        var now = new DateTimeOffset(2026, 9, 30, 10, 15, 0, TimeSpan.Zero);
+        var pace = _service.AssessHourVolumePace(
+            Hourly(now, volume: 100m, close: 100m),
+            QuarterHours(now, 80m),
+            currentPrice: 110m,
+            baselineCandles: 10,
+            now);
+
+        Assert.False(pace.IsReady);
+    }
+
+    [Fact]
+    public void DelayUntilCandleReady_WaitsForTheCandleToSettle()
+    {
+        var settle = TimeSpan.FromSeconds(10);
+        var length = TimeSpan.FromMinutes(15);
+        var atClose = new DateTimeOffset(2026, 9, 30, 10, 30, 0, TimeSpan.Zero);
+        var afterSettle = new DateTimeOffset(2026, 9, 30, 10, 30, 15, TimeSpan.Zero);
+
+        Assert.Equal(TimeSpan.FromSeconds(10), CandleClock.DelayUntilCandleReady(atClose, length, settle));
+        Assert.Equal(TimeSpan.FromMinutes(14) + TimeSpan.FromSeconds(55), CandleClock.DelayUntilCandleReady(afterSettle, length, settle));
+    }
+
+    private static IReadOnlyList<Kline> Hourly(DateTimeOffset now, decimal volume, decimal close)
+    {
+        var hourOpen = CandleClock.Floor(now, TimeSpan.FromHours(1));
+        var candles = new List<Kline>();
+        for (var i = 10; i >= 1; i--)
+        {
+            candles.Add(new Kline
+            {
+                OpenTime = hourOpen.AddHours(-i),
+                Open = close,
+                High = close,
+                Low = close,
+                Close = close,
+                Volume = volume
+            });
+        }
+
+        return candles;
+    }
+
+    private static IReadOnlyList<Kline> QuarterHours(DateTimeOffset now, params decimal[] volumes)
+    {
+        var hourOpen = CandleClock.Floor(now, TimeSpan.FromHours(1));
+        return volumes.Select((volume, index) => new Kline
+        {
+            OpenTime = hourOpen.AddMinutes(index * 15),
+            Open = 100m,
+            High = 101m,
+            Low = 99m,
+            Close = 100m,
+            Volume = volume
+        }).ToArray();
     }
 
     private static decimal[] Rising(int count, decimal start, decimal step)

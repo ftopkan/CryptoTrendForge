@@ -35,7 +35,7 @@ public sealed class BtcRegimeTests
         var prev = klines[^2];
         klines[^1] = new Kline
         {
-            OpenTime = prev.OpenTime.AddHours(4),
+            OpenTime = DateTimeOffset.UtcNow.AddHours(-4),
             Open = prev.Close,
             High = prev.Close,
             Low = prev.Close * 0.9m,

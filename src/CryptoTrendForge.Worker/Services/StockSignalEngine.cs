@@ -1,3 +1,4 @@
+using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Worker.Configuration;
@@ -21,9 +22,11 @@ public sealed class StockSignalEngine
         _stockOptions = stockOptions.Value;
     }
 
-    public ScoreResult CalculateScore(MarketSnapshot snapshot)
+    public ScoreResult CalculateScore(MarketSnapshot snapshot, DateTimeOffset? asOf = null)
     {
+        var now = asOf ?? DateTimeOffset.UtcNow;
         snapshot = UsEquitySession.WithSessionFourHourCandles(snapshot, _stockOptions);
+        snapshot = WithClosedStructure(snapshot, now);
         var breakdown = new Dictionary<string, int>();
         var reasons = new List<string>();
         var risks = new List<string>();
@@ -43,7 +46,7 @@ public sealed class StockSignalEngine
         var rsiScore = ScoreRsi(snapshot, reasons, risks, out var rsi4h);
         breakdown["rsi"] = rsiScore;
 
-        var volumeScore = ScoreVolume(snapshot, reasons, risks);
+        var volumeScore = ScoreVolume(snapshot, now, reasons, risks);
         breakdown["volume"] = volumeScore;
 
         var supportScore = ScoreSupport(snapshot, reasons, risks, out var supportDistancePct, out var supportLevel);
@@ -155,21 +158,21 @@ public sealed class StockSignalEngine
         return score;
     }
 
-    private int ScoreVolume(MarketSnapshot snapshot, List<string> reasons, List<string> risks)
+    private int ScoreVolume(MarketSnapshot snapshot, DateTimeOffset now, List<string> reasons, List<string> risks)
     {
-        var sessionCandles = snapshot.Klines1H
-            .Where(x => UsEquitySession.IsOpen(x.OpenTime, _stockOptions))
-            .ToArray();
-        var needed = _botOptions.VolumeRecentCandles + _botOptions.VolumeBaselineCandles + _botOptions.VolumeRecentCandles;
-        if (sessionCandles.Length < needed)
+        var pace = _technicalAnalysisService.AssessHourVolumePace(
+            snapshot.Klines1H,
+            snapshot.Klines15M,
+            snapshot.CurrentPrice,
+            _botOptions.VolumeBaselineCandles,
+            now,
+            candle => UsEquitySession.IsOpen(candle.OpenTime, _stockOptions));
+        if (!pace.IsReady)
         {
             return 0;
         }
 
-        var sentiment = _technicalAnalysisService.DetermineVolumeSentiment(
-            sessionCandles,
-            _botOptions.VolumeRecentCandles,
-            _botOptions.VolumeBaselineCandles);
+        var sentiment = pace.Sentiment;
 
         var score = sentiment switch
         {
@@ -183,7 +186,7 @@ public sealed class StockSignalEngine
 
         if (score >= 10)
         {
-            reasons.Add("Seans hacmi alıcıların tarafında.");
+            reasons.Add("Bu seans saatinde biriken hacim, geçen süreye düşen payı geçmiş.");
         }
         else if (sentiment == VolumeSentiment.Distribution)
         {
@@ -263,15 +266,19 @@ public sealed class StockSignalEngine
 
     private int ScoreOpenInterest(MarketSnapshot snapshot, List<string> reasons, List<string> risks)
     {
-        if (snapshot.Klines4H.Count < 2)
+        if (snapshot.Klines4H.Count == 0 || snapshot.CurrentPrice <= 0m)
         {
             return 0;
         }
 
-        var latest = snapshot.Klines4H[^1].Close;
-        var previous = snapshot.Klines4H[^2].Close;
-        var priceUp = latest > previous;
-        var priceDown = latest < previous;
+        var lastClosed = snapshot.Klines4H[^1].Close;
+        if (lastClosed <= 0m)
+        {
+            return 0;
+        }
+
+        var priceUp = snapshot.CurrentPrice > lastClosed;
+        var priceDown = snapshot.CurrentPrice < lastClosed;
         var oiUp = snapshot.OpenInterestChangePct4H > 0m;
         var oiDown = snapshot.OpenInterestChangePct4H < 0m;
 
@@ -325,5 +332,22 @@ public sealed class StockSignalEngine
         var breakoutHappened = recent.Skip(10).Any(x => x.Close > resistance);
         var latest = recent[^1];
         return breakoutHappened && latest.Low <= resistance * 1.01m && latest.Close >= resistance;
+    }
+
+    private static MarketSnapshot WithClosedStructure(MarketSnapshot snapshot, DateTimeOffset now)
+    {
+        return new MarketSnapshot
+        {
+            Symbol = snapshot.Symbol,
+            CurrentPrice = snapshot.CurrentPrice,
+            FundingRate = snapshot.FundingRate,
+            OpenInterestChangePct1H = snapshot.OpenInterestChangePct1H,
+            OpenInterestChangePct4H = snapshot.OpenInterestChangePct4H,
+            Volume24h = snapshot.Volume24h,
+            Turnover24h = snapshot.Turnover24h,
+            Klines15M = CandleClock.Closed(snapshot.Klines15M, TimeSpan.FromMinutes(15), now),
+            Klines1H = snapshot.Klines1H,
+            Klines4H = CandleClock.Closed(snapshot.Klines4H, TimeSpan.FromHours(4), now)
+        };
     }
 }

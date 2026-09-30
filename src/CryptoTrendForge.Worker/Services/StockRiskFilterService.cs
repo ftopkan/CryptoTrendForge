@@ -1,3 +1,4 @@
+using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Worker.Configuration;
 using Microsoft.Extensions.Options;
@@ -25,8 +26,10 @@ public sealed class StockRiskFilterService
         }
 
         snapshot = UsEquitySession.WithSessionFourHourCandles(snapshot, _stockOptions);
+        var closed4h = CandleClock.Closed(snapshot.Klines4H, TimeSpan.FromHours(4), now);
+        var closed1h = CandleClock.Closed(snapshot.Klines1H, TimeSpan.FromHours(1), now);
 
-        if (Is4hBearAligned(snapshot.Klines4H))
+        if (Is4hBearAligned(closed4h))
         {
             return FilterResult.Blocked("4H EMA20 < EMA50 < EMA200 hard filter.");
         }
@@ -37,12 +40,12 @@ public sealed class StockRiskFilterService
             return FilterResult.Blocked("Stock funding rate hard filter exceeded.");
         }
 
-        if (snapshot.OpenInterestChangePct1H > _stockOptions.OiSpikeHardFilterPct && IsPriceFalling(snapshot.Klines1H, 1))
+        if (snapshot.OpenInterestChangePct1H > _stockOptions.OiSpikeHardFilterPct && IsPriceFalling(snapshot.CurrentPrice, closed1h))
         {
             return FilterResult.Blocked("Open interest spike with falling price indicates aggressive short build-up.");
         }
 
-        if (IsPriceDump(snapshot.Klines4H, _stockOptions.PriceDumpHardFilterPct))
+        if (IsPriceDump(closed4h, _stockOptions.PriceDumpHardFilterPct))
         {
             return FilterResult.Blocked("Last closed 4H candle dropped beyond configured hard filter.");
         }
@@ -64,14 +67,14 @@ public sealed class StockRiskFilterService
         return ema20 < ema50 && ema50 < ema200;
     }
 
-    private static bool IsPriceFalling(IReadOnlyList<Kline> klines, int lookbackCandles)
+    private static bool IsPriceFalling(decimal currentPrice, IReadOnlyList<Kline> closedHourly)
     {
-        if (klines.Count < lookbackCandles + 1)
+        if (closedHourly.Count == 0 || currentPrice <= 0m)
         {
             return false;
         }
 
-        return klines[^1].Close < klines[klines.Count - 1 - lookbackCandles].Close;
+        return currentPrice < closedHourly[^1].Close;
     }
 
     private static bool IsPriceDump(IReadOnlyList<Kline> klines, decimal thresholdPct)

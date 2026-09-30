@@ -77,6 +77,14 @@ public sealed class SignalOutcomeWorker : BackgroundService
                 continue;
             }
 
+            var ticker = await bybitService.GetTickerAsync(signal.Coin.Symbol, cancellationToken);
+            if (ticker is null)
+            {
+                continue;
+            }
+
+            await signalRepository.InvalidateIfBrokenSupportAsync(signal.CoinId, ticker.LastPrice, cancellationToken);
+
             var elapsedMinutes = (int)Math.Floor((DateTimeOffset.UtcNow - signal.CreatedAt).TotalMinutes);
             foreach (var minuteMark in SnapshotMinutes)
             {
@@ -91,12 +99,6 @@ public sealed class SignalOutcomeWorker : BackgroundService
                     continue;
                 }
 
-                var ticker = await bybitService.GetTickerAsync(signal.Coin.Symbol, cancellationToken);
-                if (ticker is null)
-                {
-                    continue;
-                }
-
                 await signalRepository.AddOutcomeAsync(
                     signal.Id,
                     minuteMark,
@@ -106,6 +108,8 @@ public sealed class SignalOutcomeWorker : BackgroundService
                     cancellationToken);
             }
         }
+
+        await signalRepository.ExpireDueSignalsAsync(DateTimeOffset.UtcNow, cancellationToken);
     }
 
     private async Task EvaluateExitTargetsAsync(CancellationToken cancellationToken)

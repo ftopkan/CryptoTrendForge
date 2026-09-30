@@ -1,3 +1,4 @@
+using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Core.Infrastructure.Cache;
@@ -8,9 +9,6 @@ namespace CryptoTrendForge.Worker.Services;
 
 public sealed class MarketDataService
 {
-    private static readonly TimeSpan Kline15Ttl = TimeSpan.FromMinutes(14);
-    private static readonly TimeSpan Kline60Ttl = TimeSpan.FromMinutes(59);
-    private static readonly TimeSpan Kline240Ttl = TimeSpan.FromHours(3) + TimeSpan.FromMinutes(59);
     private static readonly TimeSpan OpenInterestTtl = TimeSpan.FromMinutes(4);
     private static readonly TimeSpan FundingRateTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan TickerTtl = TimeSpan.FromSeconds(30);
@@ -144,7 +142,7 @@ public sealed class MarketDataService
         }
 
         var klines = await GetKlinePagesAsync(symbol, interval, limit, pages, cancellationToken);
-        _cache.Set(key, klines, GetKlineTtl(interval));
+        _cache.Set(key, klines, GetKlineTtl(interval, DateTimeOffset.UtcNow));
         return klines;
     }
 
@@ -236,14 +234,16 @@ public sealed class MarketDataService
         return $"{symbol}:{interval}:{dataType}".ToLowerInvariant();
     }
 
-    private static TimeSpan GetKlineTtl(string interval)
+    private static TimeSpan GetKlineTtl(string interval, DateTimeOffset now)
     {
-        return interval switch
+        var length = interval switch
         {
-            "15" => Kline15Ttl,
-            "60" => Kline60Ttl,
-            "240" => Kline240Ttl,
+            "15" => TimeSpan.FromMinutes(15),
+            "60" => TimeSpan.FromHours(1),
+            "240" => TimeSpan.FromHours(4),
             _ => TimeSpan.FromMinutes(5)
         };
+
+        return CandleClock.TimeUntilNextClose(now, length);
     }
 }

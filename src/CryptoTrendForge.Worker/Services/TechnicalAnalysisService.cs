@@ -1,9 +1,12 @@
+using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Core.Domain.Enums;
 
 namespace CryptoTrendForge.Worker.Services;
 
 public readonly record struct TrendAssessment(int Score, bool IsBearAligned, string? Reason, decimal? Ema20ExtensionPct = null);
+
+public readonly record struct HourVolumePace(bool IsReady, VolumeSentiment Sentiment);
 
 public sealed class TechnicalAnalysisService
 {
@@ -203,6 +206,78 @@ public sealed class TechnicalAnalysisService
         }
 
         return VolumeSentiment.WeakMove;
+    }
+
+    public HourVolumePace AssessHourVolumePace(
+        IReadOnlyList<Kline> hourly,
+        IReadOnlyList<Kline> fifteenMinute,
+        decimal currentPrice,
+        int baselineCandles,
+        DateTimeOffset now,
+        Func<Kline, bool>? includeCandle = null)
+    {
+        const int minimumClosedQuarterHours = 2;
+        var hourOpen = CandleClock.Floor(now, TimeSpan.FromHours(1));
+        var closedHourly = CandleClock.Closed(hourly, TimeSpan.FromHours(1), now);
+        var baseline = closedHourly
+            .Where(x => x.OpenTime < hourOpen && (includeCandle is null || includeCandle(x)))
+            .OrderBy(x => x.OpenTime)
+            .TakeLast(baselineCandles)
+            .ToArray();
+        if (baseline.Length < baselineCandles)
+        {
+            return new HourVolumePace(false, VolumeSentiment.WeakMove);
+        }
+
+        var closedQuarterHours = fifteenMinute
+            .Where(x => x.OpenTime >= hourOpen && x.OpenTime.AddMinutes(15) <= now && (includeCandle is null || includeCandle(x)))
+            .ToArray();
+        if (closedQuarterHours.Length < minimumClosedQuarterHours)
+        {
+            return new HourVolumePace(false, VolumeSentiment.WeakMove);
+        }
+
+        var baselineAverage = baseline.Average(x => x.Volume);
+        if (baselineAverage <= 0m)
+        {
+            return new HourVolumePace(false, VolumeSentiment.WeakMove);
+        }
+
+        var elapsedMinutes = closedQuarterHours.Length * 15m;
+        var requiredVolume = baselineAverage * elapsedMinutes / 60m;
+        var actualVolume = closedQuarterHours.Sum(x => x.Volume);
+        var volumeUp = actualVolume >= requiredVolume;
+        var volumeDown = actualVolume < requiredVolume;
+        var previousClose = baseline[^1].Close;
+        var priceUp = currentPrice > previousClose;
+        var priceDown = currentPrice < previousClose;
+
+        if (priceUp && volumeUp)
+        {
+            return new HourVolumePace(true, VolumeSentiment.StrongBuying);
+        }
+
+        if (!priceUp && !priceDown && volumeUp)
+        {
+            return new HourVolumePace(true, VolumeSentiment.Accumulation);
+        }
+
+        if (priceDown && volumeDown)
+        {
+            return new HourVolumePace(true, VolumeSentiment.SellingPressureFading);
+        }
+
+        if (priceUp && volumeDown)
+        {
+            return new HourVolumePace(true, VolumeSentiment.WeakMove);
+        }
+
+        if (priceDown && volumeUp)
+        {
+            return new HourVolumePace(true, VolumeSentiment.Distribution);
+        }
+
+        return new HourVolumePace(true, VolumeSentiment.WeakMove);
     }
 
     public string? DetectCandlestickPattern(IReadOnlyList<Kline> klines)

@@ -1,3 +1,4 @@
+using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Core.Infrastructure.Cache;
@@ -41,8 +42,13 @@ public sealed class SignalScanWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            var delay = CandleClock.DelayUntilCandleReady(
+                DateTimeOffset.UtcNow,
+                TimeSpan.FromMinutes(_botOptions.EntryCandleMinutes),
+                TimeSpan.FromSeconds(10));
+            _logger.LogInformation("Next crypto entry scan in {DelaySeconds} seconds.", (int)delay.TotalSeconds);
+            await Task.Delay(delay, stoppingToken);
             await RunScanIterationAsync(stoppingToken);
-            await Task.Delay(TimeSpan.FromSeconds(_botOptions.ScanIntervalSeconds), stoppingToken);
         }
     }
 

@@ -8,9 +8,9 @@ public sealed class BotOptionsValidator : IValidateOptions<BotOptions>
     {
         var errors = new List<string>();
 
-        if (options.ScanIntervalSeconds <= 0)
+        if (options.EntryCandleMinutes <= 0 || 60 % options.EntryCandleMinutes != 0)
         {
-            errors.Add("BotSettings.ScanIntervalSeconds must be greater than 0.");
+            errors.Add("BotSettings.EntryCandleMinutes must be a positive divisor of 60.");
         }
 
         if (options.CooldownHours <= 0)

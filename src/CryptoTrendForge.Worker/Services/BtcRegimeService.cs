@@ -1,3 +1,4 @@
+using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Worker.Configuration;
@@ -20,9 +21,12 @@ public sealed class BtcRegimeService
 
     public BtcRegimeResult DetermineRegime(BtcSnapshot snapshot)
     {
+        var now = DateTimeOffset.UtcNow;
+        var closed4h = CandleClock.Closed(snapshot.Klines4H, TimeSpan.FromHours(4), now);
+        var closed1h = CandleClock.Closed(snapshot.Klines1H, TimeSpan.FromHours(1), now);
         var result = new BtcRegimeResult();
 
-        if (IsAnomalousDump(snapshot))
+        if (IsAnomalousDump(closed4h))
         {
             result.Regime = MarketRegime.RiskOff;
             result.SkipScan = true;
@@ -30,8 +34,8 @@ public sealed class BtcRegimeService
             return result;
         }
 
-        var ema4h20 = GetLatestEma(snapshot.Klines4H, 20);
-        var ema4h50 = GetLatestEma(snapshot.Klines4H, 50);
+        var ema4h20 = GetLatestEma(closed4h, 20);
+        var ema4h50 = GetLatestEma(closed4h, 50);
 
         if (ema4h20 == 0m || ema4h50 == 0m)
         {
@@ -54,9 +58,9 @@ public sealed class BtcRegimeService
             result.Regime = MarketRegime.Neutral;
         }
 
-        if (snapshot.Klines1H.Count >= _botOptions.RsiPeriod * 2)
+        if (closed1h.Count >= _botOptions.RsiPeriod * 2)
         {
-            var rsi1h = _technicalAnalysisService.CalculateRsi(snapshot.Klines1H, _botOptions.RsiPeriod);
+            var rsi1h = _technicalAnalysisService.CalculateRsi(closed1h, _botOptions.RsiPeriod);
 
             if (result.Regime == MarketRegime.RiskOn && rsi1h > 75m)
             {
@@ -71,15 +75,15 @@ public sealed class BtcRegimeService
         return result;
     }
 
-    private bool IsAnomalousDump(BtcSnapshot snapshot)
+    private bool IsAnomalousDump(IReadOnlyList<Kline> closed4h)
     {
-        if (snapshot.Klines4H.Count < 2)
+        if (closed4h.Count < 2)
         {
             return false;
         }
 
-        var previous = snapshot.Klines4H[^2].Close;
-        var latest = snapshot.Klines4H[^1].Close;
+        var previous = closed4h[^2].Close;
+        var latest = closed4h[^1].Close;
         if (previous == 0m)
         {
             return false;

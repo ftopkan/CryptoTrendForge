@@ -13,15 +13,18 @@ public sealed class TelegramService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly TelegramOptions _telegramOptions;
+    private readonly BotOptions _botOptions;
     private readonly ILogger<TelegramService> _logger;
 
     public TelegramService(
         IHttpClientFactory httpClientFactory,
         IOptions<TelegramOptions> telegramOptions,
+        IOptions<BotOptions> botOptions,
         ILogger<TelegramService> logger)
     {
         _httpClientFactory = httpClientFactory;
         _telegramOptions = telegramOptions.Value;
+        _botOptions = botOptions.Value;
         _logger = logger;
     }
 
@@ -137,7 +140,7 @@ public sealed class TelegramService
         sb.AppendLine($"🔊 Hacim: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("volume"))}/20");
         sb.AppendLine($"🛡️ Destek: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("support"))}/20");
         sb.AppendLine($"📌 Açık işlem: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("oi"))}/15");
-        sb.AppendLine($"✨ Mum yapısı bonusu: {FormatPoints(scoreResult.PatternBonus)}/10");
+        sb.AppendLine($"✨ Mum yapısı bonusu: {FormatPoints(scoreResult.PatternBonus)}/{_botOptions.PatternBonusPoints.ToString(Turkish)}");
         sb.AppendLine();
         AppendPositionPlan(sb, plan);
         sb.AppendLine();

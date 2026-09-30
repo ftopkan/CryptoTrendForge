@@ -10,7 +10,10 @@ public sealed class BotOptions
     /// </summary>
     public bool RunOnce { get; set; }
 
-    public int ScanIntervalSeconds { get; set; } = 300;
+    /// <summary>
+    /// Entry scans run when a candle of this length closes. Open signals are checked every 5 minutes.
+    /// </summary>
+    public int EntryCandleMinutes { get; set; } = 15;
     public int CooldownHours { get; set; } = 4;
     public bool AllowCooldownBypass { get; set; } = true;
     public int CooldownBypassMinScoreDelta { get; set; } = 15;
@@ -28,7 +31,7 @@ public sealed class BotOptions
     public decimal OiSpikeHardFilterPct { get; set; } = 15m;
     public decimal PriceDumpHardFilterPct { get; set; } = 8m;
     public bool PatternBonusEnabled { get; set; } = true;
-    public int PatternBonusPoints { get; set; } = 10;
+    public int PatternBonusPoints { get; set; } = 5;
     public ScoreThresholdOptions ScoreThresholds { get; set; } = new();
 }
 

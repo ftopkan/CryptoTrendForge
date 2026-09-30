@@ -1,3 +1,4 @@
+using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Worker.Configuration;
@@ -18,8 +19,10 @@ public sealed class SignalEngine
         _botOptions = botOptions.Value;
     }
 
-    public ScoreResult CalculateScore(MarketSnapshot snapshot, MarketRegime regime)
+    public ScoreResult CalculateScore(MarketSnapshot snapshot, MarketRegime regime, DateTimeOffset? asOf = null)
     {
+        var now = asOf ?? DateTimeOffset.UtcNow;
+        snapshot = WithClosedStructure(snapshot, now);
         var breakdown = new Dictionary<string, int>();
         var reasons = new List<string>();
         var risks = new List<string>();
@@ -39,7 +42,7 @@ public sealed class SignalEngine
         var rsiScore = ScoreRsi(snapshot, reasons, risks, out var rsi4h);
         breakdown["rsi"] = rsiScore;
 
-        var volumeScore = ScoreVolume(snapshot, reasons, risks);
+        var volumeScore = ScoreVolume(snapshot, now, reasons, risks);
         breakdown["volume"] = volumeScore;
 
         var supportScore = ScoreSupport(snapshot, reasons, risks, out var supportDistancePct, out var supportLevel);
@@ -132,17 +135,20 @@ public sealed class SignalEngine
         return score;
     }
 
-    private int ScoreVolume(MarketSnapshot snapshot, List<string> reasons, List<string> risks)
+    private int ScoreVolume(MarketSnapshot snapshot, DateTimeOffset now, List<string> reasons, List<string> risks)
     {
-        if (snapshot.Klines1H.Count < _botOptions.VolumeRecentCandles + _botOptions.VolumeBaselineCandles + _botOptions.VolumeRecentCandles)
+        var pace = _technicalAnalysisService.AssessHourVolumePace(
+            snapshot.Klines1H,
+            snapshot.Klines15M,
+            snapshot.CurrentPrice,
+            _botOptions.VolumeBaselineCandles,
+            now);
+        if (!pace.IsReady)
         {
             return 0;
         }
 
-        var sentiment = _technicalAnalysisService.DetermineVolumeSentiment(
-            snapshot.Klines1H,
-            _botOptions.VolumeRecentCandles,
-            _botOptions.VolumeBaselineCandles);
+        var sentiment = pace.Sentiment;
 
         var score = sentiment switch
         {
@@ -156,7 +162,7 @@ public sealed class SignalEngine
 
         if (score >= 10)
         {
-            reasons.Add("Hacim alıcıların tarafında.");
+            reasons.Add("Bu saatte biriken hacim, geçen süreye düşen payı geçmiş.");
         }
         else if (sentiment == VolumeSentiment.Distribution)
         {
@@ -236,15 +242,19 @@ public sealed class SignalEngine
 
     private int ScoreOpenInterest(MarketSnapshot snapshot, List<string> reasons, List<string> risks)
     {
-        if (snapshot.Klines4H.Count < 2)
+        if (snapshot.Klines4H.Count == 0 || snapshot.CurrentPrice <= 0m)
         {
             return 0;
         }
 
-        var latest = snapshot.Klines4H[^1].Close;
-        var previous = snapshot.Klines4H[^2].Close;
-        var priceUp = latest > previous;
-        var priceDown = latest < previous;
+        var lastClosed = snapshot.Klines4H[^1].Close;
+        if (lastClosed <= 0m)
+        {
+            return 0;
+        }
+
+        var priceUp = snapshot.CurrentPrice > lastClosed;
+        var priceDown = snapshot.CurrentPrice < lastClosed;
         var oiUp = snapshot.OpenInterestChangePct4H > 0m;
         var oiDown = snapshot.OpenInterestChangePct4H < 0m;
 
@@ -314,5 +324,22 @@ public sealed class SignalEngine
         {
             risks.Add("Bitcoin yönsüz; sinyalin daha net olması gerekir.");
         }
+    }
+
+    private static MarketSnapshot WithClosedStructure(MarketSnapshot snapshot, DateTimeOffset now)
+    {
+        return new MarketSnapshot
+        {
+            Symbol = snapshot.Symbol,
+            CurrentPrice = snapshot.CurrentPrice,
+            FundingRate = snapshot.FundingRate,
+            OpenInterestChangePct1H = snapshot.OpenInterestChangePct1H,
+            OpenInterestChangePct4H = snapshot.OpenInterestChangePct4H,
+            Volume24h = snapshot.Volume24h,
+            Turnover24h = snapshot.Turnover24h,
+            Klines15M = CandleClock.Closed(snapshot.Klines15M, TimeSpan.FromMinutes(15), now),
+            Klines1H = snapshot.Klines1H,
+            Klines4H = CandleClock.Closed(snapshot.Klines4H, TimeSpan.FromHours(4), now)
+        };
     }
 }
