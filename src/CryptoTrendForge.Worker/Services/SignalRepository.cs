@@ -32,10 +32,15 @@ public sealed class SignalRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Returns the most recent signal that was actually sent (non-Pending).
+    /// Pending signals are excluded so a failed Telegram send does not permanently
+    /// block the cooldown window for the coin.
+    /// </summary>
     public async Task<Signal?> GetLatestSignalByCoinIdAsync(int coinId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Signals
-            .Where(x => x.CoinId == coinId)
+            .Where(x => x.CoinId == coinId && x.Status != SignalStatus.Pending)
             .OrderByDescending(x => x.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
     }
