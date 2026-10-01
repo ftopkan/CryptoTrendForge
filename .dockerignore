@@ -4,5 +4,6 @@
 **/.vscode/
 **/.idea/
 .git/
+**/logs/
 .DS_Store
 README.md

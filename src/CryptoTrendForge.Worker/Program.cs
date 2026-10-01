@@ -16,12 +16,22 @@ if (instanceLock is null)
     return;
 }
 
+var logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
+Directory.CreateDirectory(logDirectory);
+
 var builder = Host.CreateApplicationBuilder(args);
 builder.Configuration.AddJsonFile(
     $"appsettings.{builder.Environment.EnvironmentName}.local.json",
     optional: true,
     reloadOnChange: true);
-builder.Services.AddSerilog(config => config.WriteTo.Console());
+builder.Services.AddSerilog(config => config
+    .WriteTo.Console()
+    .WriteTo.File(
+        Path.Combine(logDirectory, "worker-.txt"),
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 14,
+        shared: true,
+        flushToDiskInterval: TimeSpan.FromSeconds(1)));
 
 builder.Services.AddSingleton<IValidateOptions<BotOptions>, BotOptionsValidator>();
 builder.Services.AddSingleton<IValidateOptions<StockOptions>, StockOptionsValidator>();
