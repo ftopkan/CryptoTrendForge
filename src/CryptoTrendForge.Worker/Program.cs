@@ -9,29 +9,45 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Serilog;
 
-using var instanceLock = SingleInstanceLock.TryAcquire();
-if (instanceLock is null)
-{
-    Console.WriteLine("Another CryptoTrendForge Worker instance is already running. Exiting.");
-    return;
-}
-
 var logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
 Directory.CreateDirectory(logDirectory);
 
-var builder = Host.CreateApplicationBuilder(args);
-builder.Configuration.AddJsonFile(
-    $"appsettings.{builder.Environment.EnvironmentName}.local.json",
-    optional: true,
-    reloadOnChange: true);
-builder.Services.AddSerilog(config => config
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
     .WriteTo.Console()
     .WriteTo.File(
         Path.Combine(logDirectory, "worker-.txt"),
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 14,
         shared: true,
-        flushToDiskInterval: TimeSpan.FromSeconds(1)));
+        flushToDiskInterval: TimeSpan.FromSeconds(1))
+    .CreateLogger();
+
+try
+{
+    Log.Information("Worker process starting. BaseDirectory={BaseDirectory}", AppContext.BaseDirectory);
+
+    using var instanceLock = SingleInstanceLock.TryAcquire();
+    if (instanceLock is null)
+    {
+        Log.Warning("Another CryptoTrendForge Worker instance is already running. Exiting.");
+        return;
+    }
+
+    var builder = Host.CreateApplicationBuilder(args);
+    builder.Configuration.AddJsonFile(
+        $"appsettings.{builder.Environment.EnvironmentName}.local.json",
+        optional: true,
+        reloadOnChange: true);
+    builder.Services.AddSerilog((services, config) => config
+        .MinimumLevel.Information()
+        .WriteTo.Console()
+        .WriteTo.File(
+            Path.Combine(logDirectory, "worker-.txt"),
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 14,
+            shared: true,
+            flushToDiskInterval: TimeSpan.FromSeconds(1)));
 
 builder.Services.AddSingleton<IValidateOptions<BotOptions>, BotOptionsValidator>();
 builder.Services.AddSingleton<IValidateOptions<StockOptions>, StockOptionsValidator>();
@@ -86,5 +102,15 @@ builder.Services.AddHttpClient<BybitHttpClient>((sp, client) =>
     client.Timeout = TimeSpan.FromSeconds(bybit.TimeoutSeconds);
 });
 
-var app = builder.Build();
-await app.RunAsync();
+    var app = builder.Build();
+    await app.RunAsync();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Worker terminated unexpectedly.");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
