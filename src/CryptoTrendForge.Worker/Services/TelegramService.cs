@@ -70,11 +70,62 @@ public sealed class TelegramService
         }
     }
 
-    public async Task SendAdminAlertAsync(string message, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Sends an admin alert. Returns null on success, or a short reason the personal chat did not receive it.
+    /// </summary>
+    public async Task<string?> SendAdminAlertAsync(string message, CancellationToken cancellationToken = default)
     {
-        if (!_telegramOptions.AdminAlertsEnabled
-            || string.IsNullOrWhiteSpace(_telegramOptions.BotToken)
-            || string.IsNullOrWhiteSpace(_telegramOptions.AdminChatId))
+        var adminChatId = _telegramOptions.AdminChatId?.Trim();
+        if (!_telegramOptions.AdminAlertsEnabled)
+        {
+            return "AdminAlertsEnabled kapalı.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_telegramOptions.BotToken))
+        {
+            return "BotToken boş.";
+        }
+
+        if (string.IsNullOrWhiteSpace(adminChatId))
+        {
+            return "Telegram__AdminChatId bu süreçte boş. Değişken worker servisinde kayıtlı değil.";
+        }
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var url = $"https://api.telegram.org/bot{_telegramOptions.BotToken}/sendMessage";
+            var request = new
+            {
+                chat_id = adminChatId,
+                text = $"⚠️ Yönetici uyarısı\n{TurkeyTime.Format(DateTimeOffset.UtcNow)}\n{message}"
+            };
+
+            using var response = await client.PostAsJsonAsync(url, request, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var description = ExtractTelegramDescription(body) ?? response.StatusCode.ToString();
+            _logger.LogWarning(
+                "Admin alert send failed. Status: {StatusCode}. ChatIdSuffix: {Suffix}. Description: {Description}",
+                response.StatusCode,
+                Tail(adminChatId),
+                description);
+            return $"Telegram kişisel sohbeti reddetti ({Tail(adminChatId)}): {description}";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Admin alert send threw exception.");
+            return $"Kişisel uyarı gönderilirken hata: {ex.Message}";
+        }
+    }
+
+    public async Task SendChatNoticeAsync(string message, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_telegramOptions.BotToken) || string.IsNullOrWhiteSpace(_telegramOptions.ChatId))
         {
             return;
         }
@@ -85,20 +136,36 @@ public sealed class TelegramService
             var url = $"https://api.telegram.org/bot{_telegramOptions.BotToken}/sendMessage";
             var request = new
             {
-                chat_id = _telegramOptions.AdminChatId,
-                text = $"⚠️ Yönetici uyarısı\n{TurkeyTime.Format(DateTimeOffset.UtcNow)}\n{message}"
+                chat_id = _telegramOptions.ChatId.Trim(),
+                text = message
             };
-
             using var response = await client.PostAsJsonAsync(url, request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Admin alert send failed. Status: {StatusCode}", response.StatusCode);
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogWarning("Chat notice failed. Status: {StatusCode}. Body: {Body}", response.StatusCode, body);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Admin alert send threw exception.");
+            _logger.LogWarning(ex, "Chat notice threw exception.");
         }
+    }
+
+    private static string Tail(string value) => value.Length <= 4 ? value : value[^4..];
+
+    private static string? ExtractTelegramDescription(string body)
+    {
+        const string marker = "\"description\":\"";
+        var start = body.IndexOf(marker, StringComparison.Ordinal);
+        if (start < 0)
+        {
+            return null;
+        }
+
+        start += marker.Length;
+        var end = body.IndexOf('"', start);
+        return end > start ? body[start..end] : null;
     }
 
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");

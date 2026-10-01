@@ -33,6 +33,8 @@ public sealed class SignalScanWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await SendHeartbeatAsync(stoppingToken);
+
         if (_botOptions.RunOnce)
         {
             await RunScanIterationAsync(stoppingToken);
@@ -40,8 +42,6 @@ public sealed class SignalScanWorker : BackgroundService
             return;
         }
 
-        // Send startup heartbeat via admin alert so we know the worker is live.
-        await SendHeartbeatAsync(stoppingToken);
         var lastHeartbeat = DateTimeOffset.UtcNow;
 
         while (!stoppingToken.IsCancellationRequested)
@@ -69,9 +69,15 @@ public sealed class SignalScanWorker : BackgroundService
         {
             using var scope = _scopeFactory.CreateScope();
             var telegramService = scope.ServiceProvider.GetRequiredService<TelegramService>();
-            await telegramService.SendAdminAlertAsync(
+            var error = await telegramService.SendAdminAlertAsync(
                 $"✅ Kripto tarama worker çalışıyor — {TurkeyTime.Format(DateTimeOffset.UtcNow)}",
                 cancellationToken);
+            if (error is not null && !_botOptions.RunOnce)
+            {
+                await telegramService.SendChatNoticeAsync(
+                    $"Kişisel çalışıyorum mesajı gitmedi.\n{error}",
+                    cancellationToken);
+            }
         }
         catch (Exception ex)
         {
