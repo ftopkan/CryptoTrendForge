@@ -91,6 +91,7 @@ public sealed class StockSignalScanWorker : BackgroundService
         var stocks = await marketDataService.GetActiveStocksAsync(cancellationToken);
         var bestScore = 0;
         string? bestSymbol = null;
+        var topScores = new List<(string Symbol, int Score)>();
         foreach (var stock in stocks)
         {
             var snapshot = await marketDataService.GetStockMarketSnapshotAsync(stock.Symbol, cancellationToken);
@@ -121,6 +122,8 @@ public sealed class StockSignalScanWorker : BackgroundService
                 bestScore = scoreResult.TotalScore;
                 bestSymbol = stock.Symbol;
             }
+
+            topScores.Add((stock.Symbol, scoreResult.TotalScore));
 
             if (scoreResult.TotalScore < _stockOptions.Candidate)
             {
@@ -202,11 +205,22 @@ public sealed class StockSignalScanWorker : BackgroundService
             }
         }
 
+        var top3 = topScores.OrderByDescending(x => x.Score).Take(3).ToList();
+        var top3Text = string.Join(", ", top3.Select(x => $"{x.Symbol} {x.Score}"));
         _logger.LogInformation(
-            "Stock scan finished. Best score {BestScore} on {BestSymbol}. Candidate threshold {Threshold}.",
+            "Stock scan finished. Best score {BestScore} on {BestSymbol}. Candidate threshold {Threshold}. Top3: {Top3}",
             bestScore,
             bestSymbol ?? "-",
-            _stockOptions.Candidate);
+            _stockOptions.Candidate,
+            top3Text);
+
+        if (bestScore >= 50 && bestScore < _stockOptions.Candidate)
+        {
+            var summary = $"📊 Hisse taraması bitti — {TurkeyTime.Format(now)}\n" +
+                          $"Eşik: {_stockOptions.Candidate}\n" +
+                          string.Join("\n", top3.Select(x => $"• {x.Symbol}: {x.Score}"));
+            await telegramService.SendAdminAlertAsync(summary, cancellationToken);
+        }
     }
 
     private async Task<Signal?> ResolveActiveSignalAsync(

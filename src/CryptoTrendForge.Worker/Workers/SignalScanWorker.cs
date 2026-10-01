@@ -40,6 +40,10 @@ public sealed class SignalScanWorker : BackgroundService
             return;
         }
 
+        // Send startup heartbeat via admin alert so we know the worker is live.
+        await SendHeartbeatAsync(stoppingToken);
+        var lastHeartbeat = DateTimeOffset.UtcNow;
+
         while (!stoppingToken.IsCancellationRequested)
         {
             var delay = CandleClock.DelayUntilCandleReady(
@@ -49,6 +53,29 @@ public sealed class SignalScanWorker : BackgroundService
             _logger.LogInformation("Next crypto entry scan in {DelaySeconds} seconds.", (int)delay.TotalSeconds);
             await Task.Delay(delay, stoppingToken);
             await RunScanIterationAsync(stoppingToken);
+
+            // Hourly heartbeat so admin knows scans are still running.
+            if ((DateTimeOffset.UtcNow - lastHeartbeat).TotalHours >= 1)
+            {
+                await SendHeartbeatAsync(stoppingToken);
+                lastHeartbeat = DateTimeOffset.UtcNow;
+            }
+        }
+    }
+
+    private async Task SendHeartbeatAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var telegramService = scope.ServiceProvider.GetRequiredService<TelegramService>();
+            await telegramService.SendAdminAlertAsync(
+                $"✅ Kripto tarama worker çalışıyor — {TurkeyTime.Format(DateTimeOffset.UtcNow)}",
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Heartbeat admin alert failed.");
         }
     }
 
@@ -98,6 +125,7 @@ public sealed class SignalScanWorker : BackgroundService
         var coins = await marketDataService.GetActiveCoinsAsync(cancellationToken);
         var bestScore = 0;
         string? bestSymbol = null;
+        var topScores = new List<(string Symbol, int Score)>();
         foreach (var coin in coins)
         {
             var snapshot = await marketDataService.GetMarketSnapshotAsync(coin.Symbol, cancellationToken);
@@ -135,6 +163,8 @@ public sealed class SignalScanWorker : BackgroundService
                 bestScore = scoreResult.TotalScore;
                 bestSymbol = coin.Symbol;
             }
+
+            topScores.Add((coin.Symbol, scoreResult.TotalScore));
 
             if (scoreResult.TotalScore < candidateThreshold)
             {
@@ -217,12 +247,24 @@ public sealed class SignalScanWorker : BackgroundService
             }
         }
 
+        var top3 = topScores.OrderByDescending(x => x.Score).Take(3).ToList();
+        var top3Text = string.Join(", ", top3.Select(x => $"{x.Symbol} {x.Score}"));
         _logger.LogInformation(
-            "Scan finished. Regime {Regime}. Best score {BestScore} on {BestSymbol}. Candidate threshold {Threshold}.",
+            "Scan finished. Regime {Regime}. Best score {BestScore} on {BestSymbol}. Candidate threshold {Threshold}. Top3: {Top3}",
             regimeResult.Regime,
             bestScore,
             bestSymbol ?? "-",
-            ResolveThresholds(regimeResult.Regime).Candidate);
+            ResolveThresholds(regimeResult.Regime).Candidate,
+            top3Text);
+
+        var (cand, _) = ResolveThresholds(regimeResult.Regime);
+        if (bestScore >= 50 && bestScore < cand)
+        {
+            var summary = $"📊 Kripto tarama bitti — {TurkeyTime.Format(now)}\n" +
+                          $"Rejim: {regimeResult.Regime}  Eşik: {cand}\n" +
+                          string.Join("\n", top3.Select(x => $"• {x.Symbol}: {x.Score}"));
+            await telegramService.SendAdminAlertAsync(summary, cancellationToken);
+        }
     }
 
     private async Task<Signal?> ResolveActiveSignalAsync(
