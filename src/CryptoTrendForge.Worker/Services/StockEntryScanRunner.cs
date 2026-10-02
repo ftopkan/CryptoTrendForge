@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
@@ -57,30 +56,15 @@ public sealed class StockEntryScanRunner
             return;
         }
 
-        var scanTimer = Stopwatch.StartNew();
-        var scanBudget = _botOptions.RunOnce
-            ? TimeSpan.FromSeconds(_stockOptions.RunOnceMaxScanSeconds)
-            : TimeSpan.MaxValue;
-
         await _signalRepository.ExpireDueSignalsAsync(now, cancellationToken);
 
         var stocks = await _marketDataService.GetActiveStocksAsync(cancellationToken);
         var bestScore = 0;
         string? bestSymbol = null;
         var topScores = new List<(string Symbol, int Score)>();
-        var timedOut = false;
         foreach (var stock in stocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (scanTimer.Elapsed >= scanBudget)
-            {
-                timedOut = true;
-                _logger.LogWarning(
-                    "Stock scan stopped after {ElapsedSeconds}s (RunOnce budget {BudgetSeconds}s).",
-                    (int)scanTimer.Elapsed.TotalSeconds,
-                    _stockOptions.RunOnceMaxScanSeconds);
-                break;
-            }
 
             var snapshot = await _marketDataService.GetStockMarketSnapshotAsync(stock.Symbol, cancellationToken);
             if (snapshot is null)
@@ -173,11 +157,9 @@ public sealed class StockEntryScanRunner
         var top3Lines = top3.Count == 0
             ? "• (puan yok)"
             : string.Join("\n", top3.Select(x => $"• {x.Symbol}: {x.Score}"));
-        var timeoutNote = timedOut ? $"\n(Süre sınırı: ilk {topScores.Count} hisse tarandı.)" : string.Empty;
         var summary = $"📊 Hisse taraması bitti — {TurkeyTime.Format(now)}\n" +
                       $"Eşik: {_stockOptions.Candidate}\n" +
-                      top3Lines +
-                      timeoutNote;
+                      top3Lines;
         await _telegramService.SendAdminAlertAsync(summary, cancellationToken);
     }
 
