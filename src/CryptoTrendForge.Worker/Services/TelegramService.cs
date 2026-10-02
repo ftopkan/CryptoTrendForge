@@ -238,9 +238,9 @@ public sealed class TelegramService
         sb.AppendLine($"Giriş: ${FormatPrice(plan.Entry)} ({plan.EntryNote})");
         sb.AppendLine($"Zarar kes: ${FormatPrice(plan.Stop)} ({FormatMovePct(plan.Entry, plan.Stop)})");
         sb.AppendLine("Çıkışlar");
-        sb.AppendLine($"• Temkinli: ${FormatPrice(plan.CautiousExit)} ({FormatMovePct(plan.Entry, plan.CautiousExit)})");
-        sb.AppendLine($"• Dengeli: ${FormatPrice(plan.BalancedExit)} ({FormatMovePct(plan.Entry, plan.BalancedExit)})");
-        sb.AppendLine($"• Geniş: ${FormatPrice(plan.WideExit)} ({FormatMovePct(plan.Entry, plan.WideExit)})");
+        sb.AppendLine($"• Temkinli: ${FormatPrice(plan.CautiousExit)} ({FormatMovePct(plan.ExitMoveBase, plan.CautiousExit)})");
+        sb.AppendLine($"• Dengeli: ${FormatPrice(plan.BalancedExit)} ({FormatMovePct(plan.ExitMoveBase, plan.BalancedExit)})");
+        sb.AppendLine($"• Geniş: ${FormatPrice(plan.WideExit)} ({FormatMovePct(plan.ExitMoveBase, plan.WideExit)})");
     }
 
     private static string FormatPrice(decimal value)

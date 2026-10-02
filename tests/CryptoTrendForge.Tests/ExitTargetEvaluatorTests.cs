@@ -38,6 +38,7 @@ public sealed class ExitTargetEvaluatorTests
 
         Assert.Equal(68.3467m, plan.Entry, 4);
         Assert.Contains("anlık fiyata göre", plan.EntryNote, StringComparison.Ordinal);
+        Assert.Equal(69.88m, plan.ExitMoveBase);
         Assert.True(plan.CautiousExit > 69.88m);
         Assert.True(plan.BalancedExit > plan.CautiousExit);
         Assert.True(plan.WideExit > plan.BalancedExit);

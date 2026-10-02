@@ -14,6 +14,11 @@ public sealed class PositionPlan
     public decimal BalancedExit { get; init; }
     public decimal WideExit { get; init; }
 
+    /// <summary>
+    /// Base price for exit move percentages in Telegram (entry, or spot when exits were re-anchored).
+    /// </summary>
+    public decimal ExitMoveBase { get; init; }
+
     public static PositionPlan Create(decimal currentPrice, decimal supportLevel)
     {
         var entry = currentPrice;
@@ -45,6 +50,7 @@ public sealed class PositionPlan
         var cautiousExit = entry + (risk * CautiousRewardMultiple);
         var balancedExit = entry + (risk * BalancedRewardMultiple);
         var wideExit = entry + (risk * WideRewardMultiple);
+        var exitMoveBase = entry;
 
         // Limit entry can sit below spot; R:R targets must stay above the live price.
         if (currentPrice > entry && cautiousExit <= currentPrice)
@@ -58,6 +64,7 @@ public sealed class PositionPlan
             cautiousExit = currentPrice + (exitRisk * CautiousRewardMultiple);
             balancedExit = currentPrice + (exitRisk * BalancedRewardMultiple);
             wideExit = currentPrice + (exitRisk * WideRewardMultiple);
+            exitMoveBase = currentPrice;
 
             if (entryNote == "desteğe çekilince")
             {
@@ -72,7 +79,8 @@ public sealed class PositionPlan
             Stop = stop,
             CautiousExit = cautiousExit,
             BalancedExit = balancedExit,
-            WideExit = wideExit
+            WideExit = wideExit,
+            ExitMoveBase = exitMoveBase
         };
     }
 }
