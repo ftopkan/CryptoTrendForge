@@ -14,11 +14,6 @@ public sealed class PositionPlan
     public decimal BalancedExit { get; init; }
     public decimal WideExit { get; init; }
 
-    /// <summary>
-    /// Base price for exit move percentages in Telegram (entry, or spot when exits were re-anchored).
-    /// </summary>
-    public decimal ExitMoveBase { get; init; }
-
     public static PositionPlan Create(decimal currentPrice, decimal supportLevel)
     {
         var entry = currentPrice;
@@ -47,40 +42,14 @@ public sealed class PositionPlan
             risk = entry - stop;
         }
 
-        var cautiousExit = entry + (risk * CautiousRewardMultiple);
-        var balancedExit = entry + (risk * BalancedRewardMultiple);
-        var wideExit = entry + (risk * WideRewardMultiple);
-        var exitMoveBase = entry;
-
-        // Limit entry can sit below spot; R:R targets must stay above the live price.
-        if (currentPrice > entry && cautiousExit <= currentPrice)
-        {
-            var exitRisk = currentPrice - stop;
-            if (exitRisk <= 0m)
-            {
-                exitRisk = currentPrice * 0.03m;
-            }
-
-            cautiousExit = currentPrice + (exitRisk * CautiousRewardMultiple);
-            balancedExit = currentPrice + (exitRisk * BalancedRewardMultiple);
-            wideExit = currentPrice + (exitRisk * WideRewardMultiple);
-            exitMoveBase = currentPrice;
-
-            if (entryNote == "desteğe çekilince")
-            {
-                entryNote = "desteğe çekilince; hedefler anlık fiyata göre";
-            }
-        }
-
         return new PositionPlan
         {
             Entry = entry,
             EntryNote = entryNote,
             Stop = stop,
-            CautiousExit = cautiousExit,
-            BalancedExit = balancedExit,
-            WideExit = wideExit,
-            ExitMoveBase = exitMoveBase
+            CautiousExit = entry + (risk * CautiousRewardMultiple),
+            BalancedExit = entry + (risk * BalancedRewardMultiple),
+            WideExit = entry + (risk * WideRewardMultiple)
         };
     }
 }

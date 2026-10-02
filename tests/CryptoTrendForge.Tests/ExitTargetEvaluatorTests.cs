@@ -32,16 +32,16 @@ public sealed class ExitTargetEvaluatorTests
     }
 
     [Fact]
-    public void Create_AnchorsExitsToSpotWhenPriceAlreadyPassedPullbackTarget()
+    public void Create_KeepsExitTargetsOnEntryWhenSpotIsAbovePullbackEntry()
     {
         var plan = PositionPlan.Create(69.88m, 67.67m);
 
         Assert.Equal(68.3467m, plan.Entry, 4);
-        Assert.Contains("anlık fiyata göre", plan.EntryNote, StringComparison.Ordinal);
-        Assert.Equal(69.88m, plan.ExitMoveBase);
-        Assert.True(plan.CautiousExit > 69.88m);
-        Assert.True(plan.BalancedExit > plan.CautiousExit);
-        Assert.True(plan.WideExit > plan.BalancedExit);
+        Assert.Equal("desteğe çekilince", plan.EntryNote);
+        var risk = plan.Entry - plan.Stop;
+        Assert.Equal(plan.Entry + (risk * 0.5m), plan.CautiousExit);
+        Assert.Equal(plan.Entry + risk, plan.BalancedExit);
+        Assert.Equal(plan.Entry + (risk * 1.5m), plan.WideExit);
     }
 
     [Fact]
