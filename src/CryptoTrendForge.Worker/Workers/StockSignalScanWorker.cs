@@ -214,13 +214,10 @@ public sealed class StockSignalScanWorker : BackgroundService
             _stockOptions.Candidate,
             top3Text);
 
-        if (bestScore >= 50 && bestScore < _stockOptions.Candidate)
-        {
-            var summary = $"📊 Hisse taraması bitti — {TurkeyTime.Format(now)}\n" +
-                          $"Eşik: {_stockOptions.Candidate}\n" +
-                          string.Join("\n", top3.Select(x => $"• {x.Symbol}: {x.Score}"));
-            await telegramService.SendAdminAlertAsync(summary, cancellationToken);
-        }
+        var summary = $"📊 Hisse taraması bitti — {TurkeyTime.Format(now)}\n" +
+                      $"Eşik: {_stockOptions.Candidate}\n" +
+                      string.Join("\n", top3.Select(x => $"• {x.Symbol}: {x.Score}"));
+        await telegramService.SendAdminAlertAsync(summary, cancellationToken);
     }
 
     private async Task<Signal?> ResolveActiveSignalAsync(

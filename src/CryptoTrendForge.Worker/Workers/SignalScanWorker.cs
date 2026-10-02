@@ -33,16 +33,12 @@ public sealed class SignalScanWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await SendHeartbeatAsync(stoppingToken);
-
         if (_botOptions.RunOnce)
         {
             await RunScanIterationAsync(stoppingToken);
             _runOnceCoordinator.NotifyWorkerCompleted(nameof(SignalScanWorker));
             return;
         }
-
-        var lastHeartbeat = DateTimeOffset.UtcNow;
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -53,35 +49,6 @@ public sealed class SignalScanWorker : BackgroundService
             _logger.LogInformation("Next crypto entry scan in {DelaySeconds} seconds.", (int)delay.TotalSeconds);
             await Task.Delay(delay, stoppingToken);
             await RunScanIterationAsync(stoppingToken);
-
-            // Hourly heartbeat so admin knows scans are still running.
-            if ((DateTimeOffset.UtcNow - lastHeartbeat).TotalHours >= 1)
-            {
-                await SendHeartbeatAsync(stoppingToken);
-                lastHeartbeat = DateTimeOffset.UtcNow;
-            }
-        }
-    }
-
-    private async Task SendHeartbeatAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var scope = _scopeFactory.CreateScope();
-            var telegramService = scope.ServiceProvider.GetRequiredService<TelegramService>();
-            var error = await telegramService.SendAdminAlertAsync(
-                $"✅ Kripto tarama worker çalışıyor — {TurkeyTime.Format(DateTimeOffset.UtcNow)}",
-                cancellationToken);
-            if (error is not null && !_botOptions.RunOnce)
-            {
-                await telegramService.SendChatNoticeAsync(
-                    $"Kişisel çalışıyorum mesajı gitmedi.\n{error}",
-                    cancellationToken);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Heartbeat admin alert failed.");
         }
     }
 
@@ -264,19 +231,13 @@ public sealed class SignalScanWorker : BackgroundService
             top3Text);
 
         var (cand, _) = ResolveThresholds(regimeResult.Regime);
-        if (bestScore >= 50 && bestScore < cand)
-        {
-            var summary = $"📊 Kripto tarama bitti — {TurkeyTime.Format(now)}\n" +
-                          $"Rejim: {regimeResult.Regime}  Eşik: {cand}\n" +
-                          string.Join("\n", top3.Select(x => $"• {x.Symbol}: {x.Score}"));
-            await telegramService.SendAdminAlertAsync(summary, cancellationToken);
-        }
+        var summary = $"📊 Kripto tarama bitti — {TurkeyTime.Format(now)}\n" +
+                      $"Rejim: {regimeResult.Regime}  Eşik: {cand}\n" +
+                      string.Join("\n", top3.Select(x => $"• {x.Symbol}: {x.Score}"));
+        await telegramService.SendAdminAlertAsync(summary, cancellationToken);
 
         if (_botOptions.RunOnce)
         {
-            await telegramService.SendChatNoticeAsync(
-                $"📊 Cron tarama — {TurkeyTime.Format(now)} | Rejim: {regimeResult.Regime} | En iyi: {bestSymbol ?? "-"} {bestScore}/{cand}",
-                cancellationToken);
             WriteLastRunMarker(now, regimeResult.Regime, bestSymbol, bestScore, cand);
         }
     }
