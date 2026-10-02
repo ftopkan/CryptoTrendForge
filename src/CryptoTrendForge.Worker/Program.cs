@@ -35,7 +35,12 @@ try
         return;
     }
 
-    var builder = Host.CreateApplicationBuilder(args);
+    // Cron runs from an arbitrary working directory; always read appsettings beside the DLL.
+    var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+    {
+        Args = args,
+        ContentRootPath = AppContext.BaseDirectory
+    });
     builder.Configuration.AddJsonFile(
         $"appsettings.{builder.Environment.EnvironmentName}.local.json",
         optional: true,
@@ -104,6 +109,35 @@ builder.Services.AddHttpClient<BybitHttpClient>((sp, client) =>
 });
 
     var app = builder.Build();
+
+    var botOptions = app.Services.GetRequiredService<IOptions<BotOptions>>().Value;
+    var telegramOptions = app.Services.GetRequiredService<IOptions<TelegramOptions>>().Value;
+    Log.Information(
+        "Config loaded. Environment={Environment} ContentRoot={ContentRoot} CurrentDirectory={CurrentDirectory} RunOnce={RunOnce} TelegramConfigured={TelegramConfigured} DbProvider={DbProvider}",
+        builder.Environment.EnvironmentName,
+        builder.Environment.ContentRootPath,
+        Directory.GetCurrentDirectory(),
+        botOptions.RunOnce,
+        !string.IsNullOrWhiteSpace(telegramOptions.BotToken) && !string.IsNullOrWhiteSpace(telegramOptions.ChatId),
+        builder.Configuration["Database:Provider"] ?? "(missing)");
+
+    if (botOptions.RunOnce)
+    {
+        // Must stay below the Plesk cron interval (15 min) so a stuck run releases the lock.
+        var runOnceTimeout = TimeSpan.FromMinutes(10);
+        var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+        _ = Task.Delay(runOnceTimeout, lifetime.ApplicationStopping).ContinueWith(
+            task =>
+            {
+                if (!task.IsCanceled)
+                {
+                    Log.Warning("RunOnce cycle exceeded {Timeout}; stopping so the next cron run is not blocked.", runOnceTimeout);
+                    lifetime.StopApplication();
+                }
+            },
+            TaskScheduler.Default);
+    }
+
     await app.RunAsync();
 }
 catch (Exception ex)
