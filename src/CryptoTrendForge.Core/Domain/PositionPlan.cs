@@ -42,14 +42,37 @@ public sealed class PositionPlan
             risk = entry - stop;
         }
 
+        var cautiousExit = entry + (risk * CautiousRewardMultiple);
+        var balancedExit = entry + (risk * BalancedRewardMultiple);
+        var wideExit = entry + (risk * WideRewardMultiple);
+
+        // Limit entry can sit below spot; R:R targets must stay above the live price.
+        if (currentPrice > entry && cautiousExit <= currentPrice)
+        {
+            var exitRisk = currentPrice - stop;
+            if (exitRisk <= 0m)
+            {
+                exitRisk = currentPrice * 0.03m;
+            }
+
+            cautiousExit = currentPrice + (exitRisk * CautiousRewardMultiple);
+            balancedExit = currentPrice + (exitRisk * BalancedRewardMultiple);
+            wideExit = currentPrice + (exitRisk * WideRewardMultiple);
+
+            if (entryNote == "desteğe çekilince")
+            {
+                entryNote = "desteğe çekilince; hedefler anlık fiyata göre";
+            }
+        }
+
         return new PositionPlan
         {
             Entry = entry,
             EntryNote = entryNote,
             Stop = stop,
-            CautiousExit = entry + (risk * CautiousRewardMultiple),
-            BalancedExit = entry + (risk * BalancedRewardMultiple),
-            WideExit = entry + (risk * WideRewardMultiple)
+            CautiousExit = cautiousExit,
+            BalancedExit = balancedExit,
+            WideExit = wideExit
         };
     }
 }

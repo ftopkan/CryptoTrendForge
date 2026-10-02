@@ -32,6 +32,18 @@ public sealed class ExitTargetEvaluatorTests
     }
 
     [Fact]
+    public void Create_AnchorsExitsToSpotWhenPriceAlreadyPassedPullbackTarget()
+    {
+        var plan = PositionPlan.Create(69.88m, 67.67m);
+
+        Assert.Equal(68.3467m, plan.Entry, 4);
+        Assert.Contains("anlık fiyata göre", plan.EntryNote, StringComparison.Ordinal);
+        Assert.True(plan.CautiousExit > 69.88m);
+        Assert.True(plan.BalancedExit > plan.CautiousExit);
+        Assert.True(plan.WideExit > plan.BalancedExit);
+    }
+
+    [Fact]
     public void Apply_RecordsFirstTouchInsideTheFourHourWindow()
     {
         var signal = NewSignal();
