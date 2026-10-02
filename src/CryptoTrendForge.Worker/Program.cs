@@ -23,19 +23,59 @@ Log.Logger = new LoggerConfiguration()
         flushToDiskInterval: TimeSpan.FromSeconds(1))
     .CreateLogger();
 
+RunOnceOverlapGuard? runOnceOverlapGuard = null;
+
 try
 {
-    Log.Information("Worker process starting. BaseDirectory={BaseDirectory}", AppContext.BaseDirectory);
+    AppendCronInvocation(logDirectory);
+    var runOnce = WorkerHostSettings.IsRunOnce(AppContext.BaseDirectory, args);
+    Log.Information(
+        "Worker process starting. BaseDirectory={BaseDirectory} RunOnce={RunOnce}",
+        AppContext.BaseDirectory,
+        runOnce);
 
-    using var instanceLock = SingleInstanceLock.TryAcquire();
-    if (instanceLock is null)
+    if (runOnce)
     {
-        Log.Warning("Another CryptoTrendForge Worker instance is already running. Exiting.");
-        TryAppendSkippedRunMarker(logDirectory);
+        if (!RunOnceOverlapGuard.TryEnter(logDirectory, out runOnceOverlapGuard))
+        {
+            Log.Warning("RunOnce overlap guard blocked this invocation.");
+            TryAppendSkippedRunMarker(logDirectory, "SKIPPED (previous RunOnce still active)");
+            return;
+        }
+    }
+    else
+    {
+        using var instanceLock = SingleInstanceLock.TryAcquire();
+        if (instanceLock is null)
+        {
+            Log.Warning("Another CryptoTrendForge Worker instance is already running. Exiting.");
+            TryAppendSkippedRunMarker(logDirectory, "SKIPPED (lock held by another instance)");
+            return;
+        }
+
+        await RunHostAsync(args, logDirectory, runOnce: false, runOnceOverlapGuard: null);
         return;
     }
 
-    // Cron runs from an arbitrary working directory; always read appsettings beside the DLL.
+    await RunHostAsync(args, logDirectory, runOnce: true, runOnceOverlapGuard);
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Worker terminated unexpectedly.");
+    throw;
+}
+finally
+{
+    runOnceOverlapGuard?.Dispose();
+    Log.CloseAndFlush();
+}
+
+static async Task RunHostAsync(
+    string[] args,
+    string logDirectory,
+    bool runOnce,
+    RunOnceOverlapGuard? runOnceOverlapGuard)
+{
     var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
     {
         Args = args,
@@ -55,59 +95,75 @@ try
             shared: true,
             flushToDiskInterval: TimeSpan.FromSeconds(1)));
 
-builder.Services.AddSingleton<IValidateOptions<BotOptions>, BotOptionsValidator>();
-builder.Services.AddSingleton<IValidateOptions<StockOptions>, StockOptionsValidator>();
-builder.Services.AddSingleton<IValidateOptions<BybitOptions>, BybitOptionsValidator>();
-builder.Services
-    .AddOptions<BotOptions>()
-    .Bind(builder.Configuration.GetSection(BotOptions.SectionName))
-    .ValidateOnStart();
-builder.Services
-    .AddOptions<BybitOptions>()
-    .Bind(builder.Configuration.GetSection(BybitOptions.SectionName))
-    .ValidateOnStart();
-builder.Services
-    .AddOptions<TelegramOptions>()
-    .Bind(builder.Configuration.GetSection(TelegramOptions.SectionName));
-builder.Services
-    .AddOptions<StockOptions>()
-    .Bind(builder.Configuration.GetSection(StockOptions.SectionName))
-    .ValidateOnStart();
-builder.Services.Configure<BybitClientOptions>(opt =>
-{
-    opt.MaxRetries = builder.Configuration.GetValue<int>("Bybit:MaxRetries", 3);
-    opt.CircuitBreakerFailures = 5;
-    opt.CircuitBreakerPauseSeconds = 60;
-});
+    builder.Services.AddSingleton<IValidateOptions<BotOptions>, BotOptionsValidator>();
+    builder.Services.AddSingleton<IValidateOptions<StockOptions>, StockOptionsValidator>();
+    builder.Services.AddSingleton<IValidateOptions<BybitOptions>, BybitOptionsValidator>();
+    builder.Services
+        .AddOptions<BotOptions>()
+        .Bind(builder.Configuration.GetSection(BotOptions.SectionName))
+        .ValidateOnStart();
+    builder.Services
+        .AddOptions<BybitOptions>()
+        .Bind(builder.Configuration.GetSection(BybitOptions.SectionName))
+        .ValidateOnStart();
+    builder.Services
+        .AddOptions<TelegramOptions>()
+        .Bind(builder.Configuration.GetSection(TelegramOptions.SectionName));
+    builder.Services
+        .AddOptions<StockOptions>()
+        .Bind(builder.Configuration.GetSection(StockOptions.SectionName))
+        .ValidateOnStart();
+    builder.Services.Configure<BybitClientOptions>(opt =>
+    {
+        opt.MaxRetries = builder.Configuration.GetValue<int>("Bybit:MaxRetries", 3);
+        opt.CircuitBreakerFailures = 5;
+        opt.CircuitBreakerPauseSeconds = 60;
+    });
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    DatabaseConfiguration.ConfigureAppDbContext(options, builder.Configuration));
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        DatabaseConfiguration.ConfigureAppDbContext(options, builder.Configuration));
 
-builder.Services.AddMemoryCache();
-builder.Services.AddSingleton<MarketDataCache>();
-builder.Services.AddScoped<TechnicalAnalysisService>();
-builder.Services.AddScoped<BybitService>();
-builder.Services.AddScoped<MarketDataService>();
-builder.Services.AddScoped<BtcRegimeService>();
-builder.Services.AddScoped<RiskFilterService>();
-builder.Services.AddScoped<SignalEngine>();
-builder.Services.AddScoped<StockSignalEngine>();
-builder.Services.AddScoped<StockRiskFilterService>();
-builder.Services.AddScoped<SignalRepository>();
-builder.Services.AddScoped<TelegramService>();
-builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(20));
-builder.Services.AddSingleton<RunOnceCoordinator>();
-builder.Services.AddHostedService<StartupInitializationService>();
-builder.Services.AddHostedService<SignalScanWorker>();
-builder.Services.AddHostedService<StockSignalScanWorker>();
-builder.Services.AddHostedService<SignalOutcomeWorker>();
-builder.Services.AddHttpClient();
-builder.Services.AddHttpClient<BybitHttpClient>((sp, client) =>
-{
-    var bybit = sp.GetRequiredService<IConfiguration>().GetSection(BybitOptions.SectionName).Get<BybitOptions>() ?? new BybitOptions();
-    client.BaseAddress = new Uri(bybit.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(bybit.TimeoutSeconds);
-});
+    builder.Services.AddMemoryCache();
+    builder.Services.AddSingleton<MarketDataCache>();
+    builder.Services.AddScoped<TechnicalAnalysisService>();
+    builder.Services.AddScoped<BybitService>();
+    builder.Services.AddScoped<MarketDataService>();
+    builder.Services.AddScoped<BtcRegimeService>();
+    builder.Services.AddScoped<RiskFilterService>();
+    builder.Services.AddScoped<SignalEngine>();
+    builder.Services.AddScoped<StockSignalEngine>();
+    builder.Services.AddScoped<StockRiskFilterService>();
+    builder.Services.AddScoped<SignalRepository>();
+    builder.Services.AddScoped<TelegramService>();
+    builder.Services.AddScoped<CryptoEntryScanRunner>();
+    builder.Services.AddScoped<StockEntryScanRunner>();
+    builder.Services.AddScoped<SignalOutcomeRunner>();
+    builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(20));
+    builder.Services.AddHostedService<StartupInitializationService>();
+
+    if (runOnce)
+    {
+        if (runOnceOverlapGuard is not null)
+        {
+            builder.Services.AddSingleton(runOnceOverlapGuard);
+        }
+
+        builder.Services.AddHostedService<RunOncePipelineWorker>();
+    }
+    else
+    {
+        builder.Services.AddHostedService<SignalScanWorker>();
+        builder.Services.AddHostedService<StockSignalScanWorker>();
+        builder.Services.AddHostedService<SignalOutcomeWorker>();
+    }
+
+    builder.Services.AddHttpClient();
+    builder.Services.AddHttpClient<BybitHttpClient>((sp, client) =>
+    {
+        var bybit = sp.GetRequiredService<IConfiguration>().GetSection(BybitOptions.SectionName).Get<BybitOptions>() ?? new BybitOptions();
+        client.BaseAddress = new Uri(bybit.BaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(bybit.TimeoutSeconds);
+    });
 
     var app = builder.Build();
 
@@ -122,34 +178,28 @@ builder.Services.AddHttpClient<BybitHttpClient>((sp, client) =>
         !string.IsNullOrWhiteSpace(telegramOptions.BotToken) && !string.IsNullOrWhiteSpace(telegramOptions.ChatId),
         builder.Configuration["Database:Provider"] ?? "(missing)");
 
-    if (botOptions.RunOnce)
-    {
-        // Must stay below the Plesk cron interval (15 min) so a stuck run releases the lock.
-        var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
-        RunOnceForceExit.Register(lifetime, TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(25));
-    }
-
     await app.RunAsync();
 }
-catch (Exception ex)
+
+static void AppendCronInvocation(string logDirectory)
 {
-    Log.Fatal(ex, "Worker terminated unexpectedly.");
-    throw;
-}
-finally
-{
-    Log.CloseAndFlush();
+    try
+    {
+        var path = Path.Combine(logDirectory, "cron-invocations.txt");
+        File.AppendAllText(path, $"{DateTimeOffset.UtcNow:O} pid={Environment.ProcessId}{Environment.NewLine}");
+    }
+    catch (IOException)
+    {
+    }
 }
 
-static void TryAppendSkippedRunMarker(string logDirectory)
+static void TryAppendSkippedRunMarker(string logDirectory, string reason)
 {
     try
     {
         Directory.CreateDirectory(logDirectory);
         var path = Path.Combine(logDirectory, "last-run.txt");
-        File.AppendAllText(
-            path,
-            $"{DateTimeOffset.UtcNow:O} | SKIPPED (lock held by another instance){Environment.NewLine}");
+        File.AppendAllText(path, $"{DateTimeOffset.UtcNow:O} | {reason}{Environment.NewLine}");
     }
     catch (IOException)
     {

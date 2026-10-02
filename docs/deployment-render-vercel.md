@@ -67,9 +67,10 @@ BotSettings__RunOnce=true
 
 Production Worker `RunOnce=true` ile calisir:
 
-- Her cron calistirmasinda 1 scan + 1 outcome dongusu yapar ve cikar
-- Wrapper script gerekmez
-- Ayni anda ikinci instance acilirsa lock dosyasi nedeniyle sessizce cikar
+- Her cron calistirmasinda sirayla kripto → hisse → outcome calisir ve process `Environment.Exit(0)` ile kapanir (Plesk'in "hala calisiyorsa tekrar baslatma" secenegi icin kritik)
+- RunOnce modunda `cryptotrendforge.worker.lock` kullanilmaz; `logs/runonce-active.marker` ile 14 dk icinde cakisma onlenir
+- `logs/cron-invocations.txt` her cron tetiklemesinde bir satir yazar (dotnet hic calismadiysa dosya buyumez)
+- Plesk gorevinde **"Zaten calisiyorsa yeni ornek baslatma"** aciksa ve process kapanmazsa sonraki cronlar hic baslamaz; bu guncelleme process'i zorla kapattigi icin kontrol edin
 
 Ornek Plesk Scheduled Task (her 5 dakika):
 

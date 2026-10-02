@@ -14,4 +14,9 @@ public sealed class StockOptions
     public int MarketCloseHour { get; set; } = 16;
     public int MarketCloseMinute { get; set; } = 0;
     public bool ScanOnlyDuringMarketHours { get; set; } = true;
+
+    /// <summary>
+    /// Max wall-clock time for stock entry scan during RunOnce (Plesk cron). Keeps the process under the 15-minute cron interval.
+    /// </summary>
+    public int RunOnceMaxScanSeconds { get; set; } = 420;
 }
