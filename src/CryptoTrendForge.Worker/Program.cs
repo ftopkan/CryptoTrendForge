@@ -95,6 +95,7 @@ builder.Services.AddScoped<StockSignalEngine>();
 builder.Services.AddScoped<StockRiskFilterService>();
 builder.Services.AddScoped<SignalRepository>();
 builder.Services.AddScoped<TelegramService>();
+builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(20));
 builder.Services.AddSingleton<RunOnceCoordinator>();
 builder.Services.AddHostedService<StartupInitializationService>();
 builder.Services.AddHostedService<SignalScanWorker>();
@@ -124,18 +125,8 @@ builder.Services.AddHttpClient<BybitHttpClient>((sp, client) =>
     if (botOptions.RunOnce)
     {
         // Must stay below the Plesk cron interval (15 min) so a stuck run releases the lock.
-        var runOnceTimeout = TimeSpan.FromMinutes(10);
         var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
-        _ = Task.Delay(runOnceTimeout, lifetime.ApplicationStopping).ContinueWith(
-            task =>
-            {
-                if (!task.IsCanceled)
-                {
-                    Log.Warning("RunOnce cycle exceeded {Timeout}; stopping so the next cron run is not blocked.", runOnceTimeout);
-                    lifetime.StopApplication();
-                }
-            },
-            TaskScheduler.Default);
+        RunOnceForceExit.Register(lifetime, TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(25));
     }
 
     await app.RunAsync();

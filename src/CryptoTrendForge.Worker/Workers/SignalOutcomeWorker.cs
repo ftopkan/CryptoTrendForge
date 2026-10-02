@@ -34,8 +34,15 @@ public sealed class SignalOutcomeWorker : BackgroundService
     {
         if (_botOptions.RunOnce)
         {
-            await RunOutcomeIterationAsync(stoppingToken);
-            _runOnceCoordinator.NotifyWorkerCompleted(nameof(SignalOutcomeWorker));
+            try
+            {
+                await RunOutcomeIterationAsync(stoppingToken);
+            }
+            finally
+            {
+                _runOnceCoordinator.NotifyWorkerCompleted(nameof(SignalOutcomeWorker));
+            }
+
             return;
         }
 

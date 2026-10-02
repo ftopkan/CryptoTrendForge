@@ -38,8 +38,15 @@ public sealed class StockSignalScanWorker : BackgroundService
     {
         if (_botOptions.RunOnce)
         {
-            await RunScanIterationAsync(stoppingToken);
-            _runOnceCoordinator.NotifyWorkerCompleted(nameof(StockSignalScanWorker));
+            try
+            {
+                await RunScanIterationAsync(stoppingToken);
+            }
+            finally
+            {
+                _runOnceCoordinator.NotifyWorkerCompleted(nameof(StockSignalScanWorker));
+            }
+
             return;
         }
 

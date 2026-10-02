@@ -38,6 +38,7 @@ public sealed class RunOnceCoordinator
         {
             _logger.LogInformation("RunOnce mode: all worker cycles completed, stopping application.");
             _lifetime.StopApplication();
+            RunOnceForceExit.ScheduleForcedExitIfStillRunning(TimeSpan.FromSeconds(25));
         }
     }
 
