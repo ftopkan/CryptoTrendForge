@@ -293,8 +293,8 @@ public sealed class StockSignalEngine
         {
             <= 25m => 20,
             <= 35m => 18,
-            <= 45m => 14,
-            <= 55m => 7,
+            <= 45m => 12,
+            <= 55m => 5,
             <= 65m => 0,
             _ => -5
         };
