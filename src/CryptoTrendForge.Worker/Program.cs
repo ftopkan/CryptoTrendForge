@@ -31,6 +31,7 @@ try
     if (instanceLock is null)
     {
         Log.Warning("Another CryptoTrendForge Worker instance is already running. Exiting.");
+        TryAppendSkippedRunMarker(logDirectory);
         return;
     }
 
@@ -113,4 +114,19 @@ catch (Exception ex)
 finally
 {
     Log.CloseAndFlush();
+}
+
+static void TryAppendSkippedRunMarker(string logDirectory)
+{
+    try
+    {
+        Directory.CreateDirectory(logDirectory);
+        var path = Path.Combine(logDirectory, "last-run.txt");
+        File.AppendAllText(
+            path,
+            $"{DateTimeOffset.UtcNow:O} | SKIPPED (lock held by another instance){Environment.NewLine}");
+    }
+    catch (IOException)
+    {
+    }
 }

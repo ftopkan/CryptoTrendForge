@@ -271,6 +271,36 @@ public sealed class SignalScanWorker : BackgroundService
                           string.Join("\n", top3.Select(x => $"• {x.Symbol}: {x.Score}"));
             await telegramService.SendAdminAlertAsync(summary, cancellationToken);
         }
+
+        if (_botOptions.RunOnce)
+        {
+            await telegramService.SendChatNoticeAsync(
+                $"📊 Cron tarama — {TurkeyTime.Format(now)} | Rejim: {regimeResult.Regime} | En iyi: {bestSymbol ?? "-"} {bestScore}/{cand}",
+                cancellationToken);
+            WriteLastRunMarker(now, regimeResult.Regime, bestSymbol, bestScore, cand);
+        }
+    }
+
+    private static void WriteLastRunMarker(
+        DateTimeOffset now,
+        MarketRegime regime,
+        string? bestSymbol,
+        int bestScore,
+        int threshold)
+    {
+        try
+        {
+            var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
+            Directory.CreateDirectory(logsDir);
+            var path = Path.Combine(logsDir, "last-run.txt");
+            File.WriteAllText(
+                path,
+                $"{now:O} | regime={regime} | best={bestSymbol ?? "-"} {bestScore}/{threshold}{Environment.NewLine}");
+        }
+        catch (Exception)
+        {
+            // Best-effort marker for Plesk cron diagnostics.
+        }
     }
 
     private async Task<Signal?> ResolveActiveSignalAsync(
