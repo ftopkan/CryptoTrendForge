@@ -104,31 +104,7 @@ public sealed class StockSignalEngine
 
     private int ScoreTrend(MarketSnapshot snapshot, out bool isBearAligned, out string? reason, out decimal? ema20ExtensionPct)
     {
-        isBearAligned = false;
-        ema20ExtensionPct = null;
-        var closes = snapshot.Klines4H.Select(x => x.Close).ToArray();
-        if (closes.Length < 200)
-        {
-            if (closes.Length < 50)
-            {
-                reason = null;
-                return 0;
-            }
-
-            var ema20 = _technicalAnalysisService.CalculateEma(closes, 20)[^1];
-            var ema50 = _technicalAnalysisService.CalculateEma(closes, 50)[^1];
-            if (ema20 > ema50)
-            {
-                reason = "4 saatlik uzun ortalama için yeterli seans mumu yok; kısa ortalama ortanın üstünde.";
-                ema20ExtensionPct = ema20 == 0m ? null : Math.Round(((closes[^1] - ema20) / ema20) * 100m, 2);
-                return 12;
-            }
-
-            reason = null;
-            return 0;
-        }
-
-        var trend = _technicalAnalysisService.EvaluateTrend(closes);
+        var trend = _technicalAnalysisService.EvaluateTrend(snapshot.Klines4H.Select(x => x.Close).ToArray());
         isBearAligned = trend.IsBearAligned;
         reason = trend.Reason;
         ema20ExtensionPct = trend.Ema20ExtensionPct;
@@ -148,6 +124,10 @@ public sealed class StockSignalEngine
         if (rsi4h <= 35m)
         {
             reasons.Add("RSI düşük; satış baskısı azalmış, toparlanma ihtimali var.");
+        }
+        else if (rsi4h <= 55m)
+        {
+            reasons.Add("RSI orta bandda; trend içi sağlıklı geri çekilme bölgesi.");
         }
 
         if (rsi4h > 65m)
@@ -313,8 +293,8 @@ public sealed class StockSignalEngine
         {
             <= 25m => 20,
             <= 35m => 18,
-            <= 45m => 10,
-            <= 55m => 4,
+            <= 45m => 14,
+            <= 55m => 7,
             <= 65m => 0,
             _ => -5
         };

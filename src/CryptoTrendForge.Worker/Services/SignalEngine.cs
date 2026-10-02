@@ -126,6 +126,10 @@ public sealed class SignalEngine
         {
             reasons.Add("RSI düşük; satış baskısı azalmış, toparlanma ihtimali var.");
         }
+        else if (rsi4h <= 55m)
+        {
+            reasons.Add("RSI orta bandda; trend içi sağlıklı geri çekilme bölgesi.");
+        }
 
         if (rsi4h > 65m)
         {
@@ -287,8 +291,8 @@ public sealed class SignalEngine
         {
             <= 25m => 20,
             <= 35m => 18,
-            <= 45m => 10,
-            <= 55m => 4,
+            <= 45m => 14,
+            <= 55m => 7,
             <= 65m => 0,
             _ => -5
         };

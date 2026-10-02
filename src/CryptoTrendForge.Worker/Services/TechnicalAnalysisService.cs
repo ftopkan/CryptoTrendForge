@@ -10,6 +10,9 @@ public readonly record struct HourVolumePace(bool IsReady, VolumeSentiment Senti
 
 public sealed class TechnicalAnalysisService
 {
+    public const int TrendMinBarsPartial = 50;
+    public const int TrendMinBarsFull = 100;
+    public const int TrendLongEmaPeriodExtended = 200;
     public decimal CalculateRsi(IEnumerable<Kline> klines, int period)
     {
         var closes = klines.Select(x => x.Close).ToArray();
@@ -75,19 +78,40 @@ public sealed class TechnicalAnalysisService
 
     public TrendAssessment EvaluateTrend(IReadOnlyList<decimal> closes)
     {
-        if (closes.Count < 200)
+        if (closes.Count < TrendMinBarsPartial)
         {
             return new TrendAssessment(0, false, null);
         }
 
         var ema20 = CalculateEma(closes, 20)[^1];
         var ema50 = CalculateEma(closes, 50)[^1];
-        var ema200 = CalculateEma(closes, 200)[^1];
+        var close = closes[^1];
+        var extensionPct = ema20 == 0m ? 0m : Math.Round(((close - ema20) / ema20) * 100m, 2);
 
-        if (ema20 > ema50 && ema50 > ema200)
+        if (closes.Count < TrendMinBarsFull)
         {
-            var close = closes[^1];
-            var extensionPct = ema20 == 0m ? 0m : Math.Round(((close - ema20) / ema20) * 100m, 2);
+            if (ema20 > ema50)
+            {
+                return new TrendAssessment(
+                    12,
+                    false,
+                    "4 saatlik uzun ortalama için yeterli mum yok; kısa ortalama ortanın üstünde.",
+                    extensionPct);
+            }
+
+            if (ema20 < ema50)
+            {
+                return new TrendAssessment(0, true, null);
+            }
+
+            return new TrendAssessment(0, false, null);
+        }
+
+        var longPeriod = ResolveTrendLongEmaPeriod(closes.Count);
+        var emaLong = CalculateEma(closes, longPeriod)[^1];
+
+        if (ema20 > ema50 && ema50 > emaLong)
+        {
             if (extensionPct > 8m)
             {
                 return new TrendAssessment(18, false, "4 saatlik yükseliş uzamış; fiyat kısa ortalamadan kopmuş.", extensionPct);
@@ -96,18 +120,21 @@ public sealed class TechnicalAnalysisService
             return new TrendAssessment(25, false, "4 saatlikte kısa ortalama, uzun ortalamanın üstünde.", extensionPct);
         }
 
-        if (ema20 > ema50 && ema50 < ema200)
+        if (ema20 > ema50 && ema50 < emaLong)
         {
             return new TrendAssessment(12, false, "4 saatlik ortalamalar henüz net bir yöne oturmamış.");
         }
 
-        if (ema20 < ema50 && ema50 < ema200)
+        if (ema20 < ema50 && ema50 < emaLong)
         {
             return new TrendAssessment(0, true, null);
         }
 
         return new TrendAssessment(0, false, null);
     }
+
+    public static int ResolveTrendLongEmaPeriod(int closedBarCount) =>
+        closedBarCount >= TrendLongEmaPeriodExtended ? TrendLongEmaPeriodExtended : TrendMinBarsFull;
 
     public decimal[] FindSwingLows(IEnumerable<Kline> klines, int lookback, int neighborCount)
     {

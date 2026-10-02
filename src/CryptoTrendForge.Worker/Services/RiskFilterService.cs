@@ -56,7 +56,7 @@ public sealed class RiskFilterService
 
     private bool Is4hBearAligned(IReadOnlyList<Kline> klines)
     {
-        if (klines.Count < 200)
+        if (klines.Count < TechnicalAnalysisService.TrendMinBarsFull)
         {
             return false;
         }
@@ -64,9 +64,10 @@ public sealed class RiskFilterService
         var closes = klines.Select(x => x.Close);
         var ema20 = _technicalAnalysisService.CalculateEma(closes, 20)[^1];
         var ema50 = _technicalAnalysisService.CalculateEma(closes, 50)[^1];
-        var ema200 = _technicalAnalysisService.CalculateEma(closes, 200)[^1];
+        var longPeriod = TechnicalAnalysisService.ResolveTrendLongEmaPeriod(klines.Count);
+        var emaLong = _technicalAnalysisService.CalculateEma(closes, longPeriod)[^1];
 
-        return ema20 < ema50 && ema50 < ema200;
+        return ema20 < ema50 && ema50 < emaLong;
     }
 
     private static bool IsPriceFalling(decimal currentPrice, IReadOnlyList<Kline> closedHourly)

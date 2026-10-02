@@ -74,6 +74,15 @@ public sealed class TechnicalAnalysisTests
     }
 
     [Fact]
+    public void EvaluateTrend_KeepsFullScoreWithOnly100Bars()
+    {
+        var trend = _service.EvaluateTrend(Rising(100, 100m, 0.2m));
+
+        Assert.Equal(25, trend.Score);
+        Assert.False(trend.IsBearAligned);
+    }
+
+    [Fact]
     public void EvaluateTrend_KeepsFullScoreWhenPriceStaysNearTheShortAverage()
     {
         var trend = _service.EvaluateTrend(Rising(220, 100m, 0.2m));
