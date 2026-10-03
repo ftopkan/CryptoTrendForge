@@ -161,6 +161,43 @@ public sealed class StockSignalTests
     }
 
     [Fact]
+    public void Engine_ScoresTheOpeningHalfHourAgainstPriorSessions()
+    {
+        var engine = CreateEngine();
+        var asOf = new DateTimeOffset(2026, 9, 30, 14, 5, 0, TimeSpan.Zero);
+        var windows = UsEquitySession.RecentOpeningWindows(asOf, Settings, 11);
+        var candles = new List<Kline>();
+        for (var i = 0; i < windows.Count - 1; i++)
+        {
+            candles.Add(Quarter(windows[i].StartUtc, 100m, 100m, 40m));
+            candles.Add(Quarter(windows[i].StartUtc.AddMinutes(15), 100m, 100m, 40m));
+        }
+
+        var today = windows[^1];
+        candles.Add(Quarter(today.StartUtc, 100m, 104m, 80m));
+        candles.Add(Quarter(today.StartUtc.AddMinutes(15), 104m, 108m, 80m));
+
+        var score = engine.CalculateScore(new MarketSnapshot
+        {
+            Symbol = "AAPLUSDT",
+            CurrentPrice = 90m,
+            Klines15M = candles
+        }, asOf);
+
+        Assert.Equal(20, score.Breakdown["volume"]);
+    }
+
+    [Fact]
+    public void OpeningVolumeInterval_CoversTheHalfHourAfterTheCashOpen()
+    {
+        var inside = new DateTimeOffset(2026, 9, 30, 14, 5, 0, TimeSpan.Zero);
+        var after = new DateTimeOffset(2026, 9, 30, 14, 35, 0, TimeSpan.Zero);
+
+        Assert.True(UsEquitySession.IsOpeningVolumeInterval(inside, Settings));
+        Assert.False(UsEquitySession.IsOpeningVolumeInterval(after, Settings));
+    }
+
+    [Fact]
     public void SessionCandle_KeepsTheAfternoonBarAndDropsTheOvernightBar()
     {
         var afternoon = new DateTimeOffset(2026, 9, 29, 16, 0, 0, TimeSpan.Zero);
@@ -327,6 +364,19 @@ public sealed class StockSignalTests
         }
 
         return candles;
+    }
+
+    private static Kline Quarter(DateTimeOffset openTime, decimal open, decimal close, decimal volume)
+    {
+        return new Kline
+        {
+            OpenTime = openTime,
+            Open = open,
+            High = Math.Max(open, close) + 0.2m,
+            Low = Math.Min(open, close) - 0.2m,
+            Close = close,
+            Volume = volume
+        };
     }
 
     private static Kline Bar(DateTimeOffset openTime, decimal open, decimal close)

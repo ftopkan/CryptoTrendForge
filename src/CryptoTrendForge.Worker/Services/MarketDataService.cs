@@ -47,32 +47,39 @@ public sealed class MarketDataService
         string symbol,
         CancellationToken cancellationToken = default)
     {
-        // Trend uses EMA100 from 100 closed 4h bars (EMA200 when 200+ are available). Request one extra for the open candle.
-        return LoadSnapshotAsync(symbol, fourHourLimit: 101, cancellationToken);
+        // EMA200 needs 200 closed 4h bars. One extra bar covers the candle that is still open.
+        return LoadSnapshotAsync(
+            symbol,
+            fourHourLimit: TechnicalAnalysisService.TrendLongEmaPeriodExtended + 1,
+            fourHourPages: 1,
+            fifteenMinuteLimit: 200,
+            fifteenMinutePages: 1,
+            cancellationToken);
     }
 
     public Task<MarketSnapshot?> GetStockMarketSnapshotAsync(
         string symbol,
         CancellationToken cancellationToken = default)
     {
-        return LoadSnapshotAsync(symbol, fourHourLimit: 1000, fourHourPages: 3, cancellationToken);
-    }
-
-    private async Task<MarketSnapshot?> LoadSnapshotAsync(
-        string symbol,
-        int fourHourLimit,
-        CancellationToken cancellationToken)
-    {
-        return await LoadSnapshotAsync(symbol, fourHourLimit, fourHourPages: 1, cancellationToken);
+        // Two pages of 15m bars reach prior cash opens, so 9:30-10:00 can be compared with earlier sessions.
+        return LoadSnapshotAsync(
+            symbol,
+            fourHourLimit: 1000,
+            fourHourPages: 3,
+            fifteenMinuteLimit: 1000,
+            fifteenMinutePages: 2,
+            cancellationToken);
     }
 
     private async Task<MarketSnapshot?> LoadSnapshotAsync(
         string symbol,
         int fourHourLimit,
         int fourHourPages,
+        int fifteenMinuteLimit,
+        int fifteenMinutePages,
         CancellationToken cancellationToken)
     {
-        var kline15Task = GetKlinesCachedAsync(symbol, "15", 200, 1, cancellationToken);
+        var kline15Task = GetKlinesCachedAsync(symbol, "15", fifteenMinuteLimit, fifteenMinutePages, cancellationToken);
         var kline1hTask = GetKlinesCachedAsync(symbol, "60", 200, 1, cancellationToken);
         var kline4hTask = GetKlinesCachedAsync(symbol, "240", fourHourLimit, fourHourPages, cancellationToken);
         var oi1hTask = GetOpenInterestChangePctCachedAsync(symbol, "1h", cancellationToken);

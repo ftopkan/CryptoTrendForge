@@ -141,10 +141,14 @@ public sealed class StockSignalEngine
         var pace = _technicalAnalysisService.AssessHourVolumePace(
             snapshot.Klines1H,
             snapshot.Klines15M,
-            snapshot.CurrentPrice,
             _botOptions.VolumeBaselineCandles,
             now,
             candle => UsEquitySession.IsOpen(candle.OpenTime, _stockOptions));
+        if (!pace.IsReady)
+        {
+            pace = AssessOpeningVolume(snapshot.Klines15M, now);
+        }
+
         if (!pace.IsReady)
         {
             return 0;
@@ -174,6 +178,29 @@ public sealed class StockSignalEngine
         return score;
     }
 
+    private HourVolumePace AssessOpeningVolume(IReadOnlyList<Kline> fifteenMinute, DateTimeOffset now)
+    {
+        if (!UsEquitySession.IsOpeningVolumeInterval(now, _stockOptions))
+        {
+            return new HourVolumePace(false, VolumeSentiment.WeakMove);
+        }
+
+        var windows = UsEquitySession.RecentOpeningWindows(now, _stockOptions, 30);
+        if (windows.Count < 2)
+        {
+            return new HourVolumePace(false, VolumeSentiment.WeakMove);
+        }
+
+        var current = windows[^1];
+        var prior = windows.Take(windows.Count - 1).Select(x => (x.StartUtc, x.EndUtc)).ToArray();
+        return _technicalAnalysisService.AssessWindowVolumePace(
+            fifteenMinute,
+            current.StartUtc,
+            current.EndUtc,
+            prior,
+            _botOptions.VolumeBaselineCandles);
+    }
+
     private int ScoreSupport(
         MarketSnapshot snapshot,
         List<string> reasons,
@@ -185,24 +212,12 @@ public sealed class StockSignalEngine
         supportLevel = 0m;
 
         var swing1h = _technicalAnalysisService.FindSwingLows(snapshot.Klines1H, _botOptions.SwingLookbackCandles, _botOptions.SwingNeighborCount);
-        var supports = swing1h
-            .Where(x => x > 0m)
-            .Distinct()
-            .OrderByDescending(x => x)
-            .ToArray();
-
-        if (supports.Length == 0 || snapshot.CurrentPrice <= 0m)
+        supportLevel = TechnicalAnalysisService.NearestSupport(swing1h, snapshot.CurrentPrice);
+        if (supportLevel == 0m)
         {
             return 0;
         }
 
-        var belowOrNear = supports.Where(x => x <= snapshot.CurrentPrice).Take(2).ToArray();
-        if (belowOrNear.Length == 0)
-        {
-            belowOrNear = supports.Take(2).ToArray();
-        }
-
-        supportLevel = belowOrNear.Average();
         supportDistancePct = ((snapshot.CurrentPrice - supportLevel) / supportLevel) * 100m;
 
         int score;

@@ -3,6 +3,8 @@ using CryptoTrendForge.Worker.Configuration;
 
 namespace CryptoTrendForge.Worker.Services;
 
+public readonly record struct TradingWindow(DateTimeOffset StartUtc, DateTimeOffset EndUtc);
+
 public static class UsEquitySession
 {
     private static readonly TimeSpan MinimumCandleOverlap = TimeSpan.FromHours(3);
@@ -65,6 +67,38 @@ public static class UsEquitySession
             .ToArray();
     }
 
+    public static bool IsOpeningVolumeInterval(DateTimeOffset utc, StockOptions options)
+    {
+        var local = TimeZoneInfo.ConvertTime(utc, Eastern);
+        if (local.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+        {
+            return false;
+        }
+
+        var minuteOfDay = (local.Hour * 60) + local.Minute;
+        var open = (options.MarketOpenHour * 60) + options.MarketOpenMinute;
+        return minuteOfDay >= open + 30 && minuteOfDay < open + 60;
+    }
+
+    public static IReadOnlyList<TradingWindow> RecentOpeningWindows(DateTimeOffset utc, StockOptions options, int count)
+    {
+        var local = TimeZoneInfo.ConvertTime(utc, Eastern);
+        var windows = new List<TradingWindow>(count);
+        var day = local.Date;
+        while (windows.Count < count)
+        {
+            if (day.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
+            {
+                windows.Add(ToOpeningWindow(day, options));
+            }
+
+            day = day.AddDays(-1);
+        }
+
+        windows.Reverse();
+        return windows;
+    }
+
     public static bool OverlapsSession(DateTimeOffset candleOpenUtc, TimeSpan candleLength, StockOptions options)
     {
         var candleEndUtc = candleOpenUtc + candleLength;
@@ -98,6 +132,16 @@ public static class UsEquitySession
         }
 
         return overlap >= MinimumCandleOverlap;
+    }
+
+    private static TradingWindow ToOpeningWindow(DateTime date, StockOptions options)
+    {
+        var openMinute = (options.MarketOpenHour * 60) + options.MarketOpenMinute;
+        var startLocal = DateTime.SpecifyKind(date.AddMinutes(openMinute), DateTimeKind.Unspecified);
+        var endLocal = DateTime.SpecifyKind(date.AddMinutes(openMinute + 30), DateTimeKind.Unspecified);
+        return new TradingWindow(
+            new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(startLocal, Eastern)),
+            new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(endLocal, Eastern)));
     }
 
     private static TimeZoneInfo ResolveEastern()

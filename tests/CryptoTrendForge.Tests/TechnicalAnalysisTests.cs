@@ -74,6 +74,13 @@ public sealed class TechnicalAnalysisTests
     }
 
     [Fact]
+    public void ResolveTrendLongEmaPeriod_Uses200OnceEnoughBarsExist()
+    {
+        Assert.Equal(100, TechnicalAnalysisService.ResolveTrendLongEmaPeriod(199));
+        Assert.Equal(200, TechnicalAnalysisService.ResolveTrendLongEmaPeriod(200));
+    }
+
+    [Fact]
     public void EvaluateTrend_KeepsFullScoreWithOnly100Bars()
     {
         var trend = _service.EvaluateTrend(Rising(100, 100m, 0.2m));
@@ -142,15 +149,32 @@ public sealed class TechnicalAnalysisTests
     public void AssessHourVolumePace_ScoresBuyingWhenTheHourHasAlreadyBeatenItsShare()
     {
         var now = new DateTimeOffset(2026, 9, 30, 10, 30, 0, TimeSpan.Zero);
+        var quarters = QuarterHours(now, 30m, 30m);
+        quarters[0].Close = 104m;
+        quarters[1].Open = 104m;
+        quarters[1].Close = 108m;
         var pace = _service.AssessHourVolumePace(
             Hourly(now, volume: 100m, close: 100m),
-            QuarterHours(now, 30m, 30m),
-            currentPrice: 110m,
+            quarters,
             baselineCandles: 10,
             now);
 
         Assert.True(pace.IsReady);
         Assert.Equal(VolumeSentiment.StrongBuying, pace.Sentiment);
+    }
+
+    [Fact]
+    public void AssessHourVolumePace_KeepsAFlatClosedWindowFlat()
+    {
+        var now = new DateTimeOffset(2026, 9, 30, 10, 30, 0, TimeSpan.Zero);
+        var pace = _service.AssessHourVolumePace(
+            Hourly(now, volume: 100m, close: 100m),
+            QuarterHours(now, 30m, 30m),
+            baselineCandles: 10,
+            now);
+
+        Assert.True(pace.IsReady);
+        Assert.Equal(VolumeSentiment.Accumulation, pace.Sentiment);
     }
 
     [Fact]
@@ -160,7 +184,6 @@ public sealed class TechnicalAnalysisTests
         var pace = _service.AssessHourVolumePace(
             Hourly(now, volume: 100m, close: 100m),
             QuarterHours(now, 20m, 20m),
-            currentPrice: 110m,
             baselineCandles: 10,
             now);
 
@@ -175,11 +198,22 @@ public sealed class TechnicalAnalysisTests
         var pace = _service.AssessHourVolumePace(
             Hourly(now, volume: 100m, close: 100m),
             QuarterHours(now, 80m),
-            currentPrice: 110m,
             baselineCandles: 10,
             now);
 
         Assert.False(pace.IsReady);
+    }
+
+    [Fact]
+    public void NearestSupport_UsesTheClosestSwingBelowPrice()
+    {
+        Assert.Equal(100m, TechnicalAnalysisService.NearestSupport([90m, 100m, 80m], 101m));
+    }
+
+    [Fact]
+    public void NearestSupport_UsesTheClosestSwingAbovePriceWhenAllAreBroken()
+    {
+        Assert.Equal(110m, TechnicalAnalysisService.NearestSupport([120m, 110m], 105m));
     }
 
     [Fact]
@@ -214,7 +248,7 @@ public sealed class TechnicalAnalysisTests
         return candles;
     }
 
-    private static IReadOnlyList<Kline> QuarterHours(DateTimeOffset now, params decimal[] volumes)
+    private static Kline[] QuarterHours(DateTimeOffset now, params decimal[] volumes)
     {
         var hourOpen = CandleClock.Floor(now, TimeSpan.FromHours(1));
         return volumes.Select((volume, index) => new Kline

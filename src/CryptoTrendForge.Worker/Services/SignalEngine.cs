@@ -144,7 +144,6 @@ public sealed class SignalEngine
         var pace = _technicalAnalysisService.AssessHourVolumePace(
             snapshot.Klines1H,
             snapshot.Klines15M,
-            snapshot.CurrentPrice,
             _botOptions.VolumeBaselineCandles,
             now);
         if (!pace.IsReady)
@@ -187,24 +186,12 @@ public sealed class SignalEngine
         supportLevel = 0m;
 
         var swing4h = _technicalAnalysisService.FindSwingLows(snapshot.Klines4H, _botOptions.SwingLookbackCandles, _botOptions.SwingNeighborCount);
-        var supports = swing4h
-            .Where(x => x > 0m)
-            .Distinct()
-            .OrderByDescending(x => x)
-            .ToArray();
-
-        if (supports.Length == 0 || snapshot.CurrentPrice <= 0m)
+        supportLevel = TechnicalAnalysisService.NearestSupport(swing4h, snapshot.CurrentPrice);
+        if (supportLevel == 0m)
         {
             return 0;
         }
 
-        var belowOrNear = supports.Where(x => x <= snapshot.CurrentPrice).Take(2).ToArray();
-        if (belowOrNear.Length == 0)
-        {
-            belowOrNear = supports.Take(2).ToArray();
-        }
-
-        supportLevel = belowOrNear.Average();
         supportDistancePct = ((snapshot.CurrentPrice - supportLevel) / supportLevel) * 100m;
 
         int score;
@@ -246,19 +233,20 @@ public sealed class SignalEngine
 
     private int ScoreOpenInterest(MarketSnapshot snapshot, List<string> reasons, List<string> risks)
     {
-        if (snapshot.Klines4H.Count == 0 || snapshot.CurrentPrice <= 0m)
+        if (snapshot.Klines4H.Count < 2)
         {
             return 0;
         }
 
-        var lastClosed = snapshot.Klines4H[^1].Close;
-        if (lastClosed <= 0m)
+        var previousClose = snapshot.Klines4H[^2].Close;
+        var lastClose = snapshot.Klines4H[^1].Close;
+        if (previousClose <= 0m || lastClose <= 0m)
         {
             return 0;
         }
 
-        var priceUp = snapshot.CurrentPrice > lastClosed;
-        var priceDown = snapshot.CurrentPrice < lastClosed;
+        var priceUp = lastClose > previousClose;
+        var priceDown = lastClose < previousClose;
         var oiUp = snapshot.OpenInterestChangePct4H > 0m;
         var oiDown = snapshot.OpenInterestChangePct4H < 0m;
 

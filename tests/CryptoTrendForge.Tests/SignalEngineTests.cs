@@ -103,21 +103,21 @@ public sealed class SignalEngineTests
     }
 
     [Fact]
-    public void CalculateScore_ComparesOpenInterestWithTheCurrentPrice()
+    public void CalculateScore_ComparesOpenInterestWithTheLastClosedFourHourCandle()
     {
         var options = Options.Create(new BotOptions());
         var engine = new SignalEngine(new TechnicalAnalysisService(), options);
-        var asOf = new DateTimeOffset(2026, 9, 30, 12, 0, 0, TimeSpan.Zero);
+        var asOf = new DateTimeOffset(2026, 9, 30, 12, 30, 0, TimeSpan.Zero);
         var snapshot = new MarketSnapshot
         {
             Symbol = "TESTUSDT",
-            CurrentPrice = 95m,
+            CurrentPrice = 80m,
             OpenInterestChangePct4H = 4m,
             Klines4H =
             [
-                Candle(asOf.AddHours(-8), 110m, 100m, 111m, 99m),
-                Candle(asOf.AddHours(-4), 100m, 90m, 101m, 89m),
-                Candle(asOf, 90m, 80m, 91m, 79m)
+                Candle(asOf.AddHours(-8), 100m, 90m, 101m, 89m),
+                Candle(asOf.AddHours(-4), 90m, 100m, 101m, 89m),
+                Candle(asOf, 100m, 80m, 101m, 79m)
             ]
         };
 

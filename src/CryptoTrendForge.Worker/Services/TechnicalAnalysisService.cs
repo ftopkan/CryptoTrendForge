@@ -238,7 +238,6 @@ public sealed class TechnicalAnalysisService
     public HourVolumePace AssessHourVolumePace(
         IReadOnlyList<Kline> hourly,
         IReadOnlyList<Kline> fifteenMinute,
-        decimal currentPrice,
         int baselineCandles,
         DateTimeOffset now,
         Func<Kline, bool>? includeCandle = null)
@@ -256,9 +255,7 @@ public sealed class TechnicalAnalysisService
             return new HourVolumePace(false, VolumeSentiment.WeakMove);
         }
 
-        var closedQuarterHours = fifteenMinute
-            .Where(x => x.OpenTime >= hourOpen && x.OpenTime.AddMinutes(15) <= now && (includeCandle is null || includeCandle(x)))
-            .ToArray();
+        var closedQuarterHours = ClosedQuarterHours(fifteenMinute, hourOpen, now, includeCandle);
         if (closedQuarterHours.Length < minimumClosedQuarterHours)
         {
             return new HourVolumePace(false, VolumeSentiment.WeakMove);
@@ -273,11 +270,86 @@ public sealed class TechnicalAnalysisService
         var elapsedMinutes = closedQuarterHours.Length * 15m;
         var requiredVolume = baselineAverage * elapsedMinutes / 60m;
         var actualVolume = closedQuarterHours.Sum(x => x.Volume);
+        return PaceFromClosedWindow(closedQuarterHours, actualVolume, requiredVolume);
+    }
+
+    public HourVolumePace AssessWindowVolumePace(
+        IReadOnlyList<Kline> fifteenMinute,
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
+        IReadOnlyList<(DateTimeOffset Start, DateTimeOffset End)> priorWindows,
+        int baselineWindows)
+    {
+        var current = ClosedQuarterHours(fifteenMinute, windowStart, windowEnd, includeCandle: null);
+        if (current.Length < 2)
+        {
+            return new HourVolumePace(false, VolumeSentiment.WeakMove);
+        }
+
+        var baseline = new List<decimal>();
+        foreach (var (start, end) in priorWindows)
+        {
+            var bars = ClosedQuarterHours(fifteenMinute, start, end, includeCandle: null);
+            if (bars.Length < 2)
+            {
+                continue;
+            }
+
+            baseline.Add(bars.Sum(x => x.Volume));
+        }
+
+        var sample = baseline.TakeLast(baselineWindows).ToArray();
+        if (sample.Length < baselineWindows)
+        {
+            return new HourVolumePace(false, VolumeSentiment.WeakMove);
+        }
+
+        var requiredVolume = sample.Average();
+        if (requiredVolume <= 0m)
+        {
+            return new HourVolumePace(false, VolumeSentiment.WeakMove);
+        }
+
+        return PaceFromClosedWindow(current, current.Sum(x => x.Volume), requiredVolume);
+    }
+
+    public static decimal NearestSupport(IEnumerable<decimal> swingLows, decimal price)
+    {
+        var supports = swingLows.Where(x => x > 0m).Distinct().OrderByDescending(x => x).ToArray();
+        if (supports.Length == 0 || price <= 0m)
+        {
+            return 0m;
+        }
+
+        foreach (var level in supports)
+        {
+            if (level <= price)
+            {
+                return level;
+            }
+        }
+
+        return supports[^1];
+    }
+
+    private static Kline[] ClosedQuarterHours(
+        IReadOnlyList<Kline> fifteenMinute,
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
+        Func<Kline, bool>? includeCandle)
+    {
+        return fifteenMinute
+            .Where(x => x.OpenTime >= windowStart && x.OpenTime.AddMinutes(15) <= windowEnd && (includeCandle is null || includeCandle(x)))
+            .OrderBy(x => x.OpenTime)
+            .ToArray();
+    }
+
+    private static HourVolumePace PaceFromClosedWindow(IReadOnlyList<Kline> closedQuarterHours, decimal actualVolume, decimal requiredVolume)
+    {
         var volumeUp = actualVolume >= requiredVolume;
         var volumeDown = actualVolume < requiredVolume;
-        var previousClose = baseline[^1].Close;
-        var priceUp = currentPrice > previousClose;
-        var priceDown = currentPrice < previousClose;
+        var priceUp = closedQuarterHours[^1].Close > closedQuarterHours[0].Open;
+        var priceDown = closedQuarterHours[^1].Close < closedQuarterHours[0].Open;
 
         if (priceUp && volumeUp)
         {
