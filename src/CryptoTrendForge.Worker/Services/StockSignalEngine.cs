@@ -26,6 +26,7 @@ public sealed class StockSignalEngine
     {
         var now = asOf ?? DateTimeOffset.UtcNow;
         snapshot = UsEquitySession.WithSessionFourHourCandles(snapshot, _stockOptions);
+        snapshot = WithSessionHourCandles(snapshot);
         snapshot = WithClosedStructure(snapshot, now);
         var breakdown = new Dictionary<string, int>();
         var reasons = new List<string>();
@@ -43,7 +44,7 @@ public sealed class StockSignalEngine
             risks.Add("4 saatlik ortalamalar düşüş sırasında.");
         }
 
-        var rsiScore = ScoreRsi(snapshot, reasons, risks, out var rsi4h);
+        var rsiScore = ScoreRsi(snapshot, reasons, risks, out var rsi1h);
         breakdown["rsi"] = rsiScore;
 
         var volumeScore = ScoreVolume(snapshot, now, reasons, risks);
@@ -52,10 +53,7 @@ public sealed class StockSignalEngine
         var supportScore = ScoreSupport(snapshot, reasons, risks, out var supportDistancePct, out var supportLevel);
         breakdown["support"] = supportScore;
 
-        var oiScore = ScoreOpenInterest(snapshot, reasons, risks);
-        breakdown["oi"] = oiScore;
-
-        var baseScore = Math.Clamp(trendScore + rsiScore + volumeScore + supportScore + oiScore, 0, 100);
+        var baseScore = Math.Clamp(trendScore + rsiScore + volumeScore + supportScore, 0, 100);
         var patternMain = _technicalAnalysisService.DetectCandlestickPattern(snapshot.Klines4H);
         var pattern15m = _technicalAnalysisService.DetectCandlestickPattern(snapshot.Klines15M);
         var patternBonus = _botOptions.PatternBonusEnabled && patternMain is not null
@@ -66,7 +64,7 @@ public sealed class StockSignalEngine
         if (patternBonus > 0)
         {
             reasons.Add($"Mum yapısı: {patternMain}.");
-            if (supportScore >= 13)
+            if (supportScore >= SupportNear)
             {
                 reasons.Add($"Destekte bu mum yapısı var: {patternMain}. Dönüş ihtimali artıyor.");
             }
@@ -81,7 +79,7 @@ public sealed class StockSignalEngine
             SupportDistancePct = Math.Round(supportDistancePct, 2),
             PatternName = patternMain,
             PatternName15m = pattern15m,
-            Rsi4H = rsi4h,
+            Rsi4H = rsi1h,
             Ema20ExtensionPct = ema20ExtensionPct,
             Breakdown = breakdown,
             Reasons = reasons,
@@ -95,7 +93,7 @@ public sealed class StockSignalEngine
                 snapshot.OpenInterestChangePct4H,
                 supportLevel,
                 supportDistancePct,
-                rsi4h,
+                rsi1h,
                 ema20ExtensionPct,
                 asset = "stock"
             }
@@ -111,28 +109,28 @@ public sealed class StockSignalEngine
         return trend.Score;
     }
 
-    private int ScoreRsi(MarketSnapshot snapshot, List<string> reasons, List<string> risks, out decimal? rsi4h)
+    private int ScoreRsi(MarketSnapshot snapshot, List<string> reasons, List<string> risks, out decimal? rsi1h)
     {
-        rsi4h = null;
-        if (snapshot.Klines4H.Count < _botOptions.RsiPeriod * 2)
+        rsi1h = null;
+        if (snapshot.Klines1H.Count < _botOptions.RsiPeriod * 2)
         {
             return 0;
         }
 
-        rsi4h = _technicalAnalysisService.CalculateRsi(snapshot.Klines4H, _botOptions.RsiPeriod);
-        var score = ScoreRsiBucket(rsi4h.Value);
-        if (rsi4h <= 35m)
+        rsi1h = _technicalAnalysisService.CalculateRsi(snapshot.Klines1H, _botOptions.RsiPeriod);
+        var score = ScoreRsiBucket(rsi1h.Value);
+        if (rsi1h <= 35m)
         {
             reasons.Add("RSI düşük; satış baskısı azalmış, toparlanma ihtimali var.");
         }
-        else if (rsi4h <= 55m)
+        else if (rsi1h <= 55m)
         {
             reasons.Add("RSI orta bandda; trend içi sağlıklı geri çekilme bölgesi.");
         }
 
-        if (rsi4h > 65m)
+        if (rsi1h > 65m)
         {
-            risks.Add("4 saatlik RSI yüksek; yükseliş yorulmuş olabilir.");
+            risks.Add("1 saatlik RSI yüksek; yükseliş yorulmuş olabilir.");
         }
 
         return score;
@@ -186,8 +184,8 @@ public sealed class StockSignalEngine
         supportDistancePct = 0m;
         supportLevel = 0m;
 
-        var swing4h = _technicalAnalysisService.FindSwingLows(snapshot.Klines4H, _botOptions.SwingLookbackCandles, _botOptions.SwingNeighborCount);
-        var supports = swing4h
+        var swing1h = _technicalAnalysisService.FindSwingLows(snapshot.Klines1H, _botOptions.SwingLookbackCandles, _botOptions.SwingNeighborCount);
+        var supports = swing1h
             .Where(x => x > 0m)
             .Distinct()
             .OrderByDescending(x => x)
@@ -210,81 +208,46 @@ public sealed class StockSignalEngine
         int score;
         if (snapshot.CurrentPrice < supportLevel)
         {
-            score = -15;
+            score = ScaleSupport(-15);
             risks.Add("Fiyat destek seviyesinin altında.");
         }
         else if (supportDistancePct <= 1.5m)
         {
-            score = 20;
+            score = SupportMax;
         }
         else if (supportDistancePct <= 3m)
         {
-            score = 13;
+            score = ScaleSupport(13);
         }
         else if (supportDistancePct <= 5m)
         {
-            score = 5;
+            score = ScaleSupport(5);
         }
         else
         {
             score = 0;
         }
 
-        if (score >= 13)
+        if (score >= SupportNear)
         {
             reasons.Add("Fiyat desteğe yakın.");
         }
 
-        if (HasBreakoutRetest(snapshot.Klines4H))
+        if (HasBreakoutRetest(snapshot.Klines1H))
         {
-            score = Math.Min(20, score + 5);
+            score = Math.Min(SupportMax, score + ScaleSupport(5));
             reasons.Add("Fiyat direnci kırıp geri test etmiş; bu seviye artık destek.");
         }
 
         return score;
     }
 
-    private int ScoreOpenInterest(MarketSnapshot snapshot, List<string> reasons, List<string> risks)
+    private const int SupportMax = 35;
+    private const int SupportNear = 23;
+
+    private static int ScaleSupport(int cryptoPoints)
     {
-        if (snapshot.Klines4H.Count == 0 || snapshot.CurrentPrice <= 0m)
-        {
-            return 0;
-        }
-
-        var lastClosed = snapshot.Klines4H[^1].Close;
-        if (lastClosed <= 0m)
-        {
-            return 0;
-        }
-
-        var priceUp = snapshot.CurrentPrice > lastClosed;
-        var priceDown = snapshot.CurrentPrice < lastClosed;
-        var oiUp = snapshot.OpenInterestChangePct4H > 0m;
-        var oiDown = snapshot.OpenInterestChangePct4H < 0m;
-
-        if (priceUp && oiUp)
-        {
-            reasons.Add("Fiyat ve açık işlem sayısı birlikte artıyor; yeni alım var.");
-            return 15;
-        }
-
-        if (priceDown && oiDown)
-        {
-            return 8;
-        }
-
-        if (priceUp && oiDown)
-        {
-            return 5;
-        }
-
-        if (priceDown && oiUp)
-        {
-            risks.Add("Fiyat düşerken açık işlem artıyor; satış baskısı gelebilir.");
-            return -5;
-        }
-
-        return 0;
+        return (int)Math.Round(cryptoPoints * (SupportMax / 20m), MidpointRounding.AwayFromZero);
     }
 
     private static int ScoreRsiBucket(decimal rsi)
@@ -300,14 +263,31 @@ public sealed class StockSignalEngine
         };
     }
 
-    private static bool HasBreakoutRetest(IReadOnlyList<Kline> klines4h)
+    private MarketSnapshot WithSessionHourCandles(MarketSnapshot snapshot)
     {
-        if (klines4h.Count < 15)
+        return new MarketSnapshot
+        {
+            Symbol = snapshot.Symbol,
+            CurrentPrice = snapshot.CurrentPrice,
+            FundingRate = snapshot.FundingRate,
+            OpenInterestChangePct1H = snapshot.OpenInterestChangePct1H,
+            OpenInterestChangePct4H = snapshot.OpenInterestChangePct4H,
+            Volume24h = snapshot.Volume24h,
+            Turnover24h = snapshot.Turnover24h,
+            Klines15M = snapshot.Klines15M,
+            Klines1H = snapshot.Klines1H.Where(candle => UsEquitySession.IsOpen(candle.OpenTime, _stockOptions)).ToArray(),
+            Klines4H = snapshot.Klines4H
+        };
+    }
+
+    private static bool HasBreakoutRetest(IReadOnlyList<Kline> klines1h)
+    {
+        if (klines1h.Count < 15)
         {
             return false;
         }
 
-        var recent = klines4h.TakeLast(15).ToArray();
+        var recent = klines1h.TakeLast(15).ToArray();
         var resistance = recent.Take(10).Max(x => x.High);
         var breakoutHappened = recent.Skip(10).Any(x => x.Close > resistance);
         var latest = recent[^1];
@@ -326,7 +306,7 @@ public sealed class StockSignalEngine
             Volume24h = snapshot.Volume24h,
             Turnover24h = snapshot.Turnover24h,
             Klines15M = CandleClock.Closed(snapshot.Klines15M, TimeSpan.FromMinutes(15), now),
-            Klines1H = snapshot.Klines1H,
+            Klines1H = CandleClock.Closed(snapshot.Klines1H, TimeSpan.FromHours(1), now),
             Klines4H = CandleClock.Closed(snapshot.Klines4H, TimeSpan.FromHours(4), now)
         };
     }

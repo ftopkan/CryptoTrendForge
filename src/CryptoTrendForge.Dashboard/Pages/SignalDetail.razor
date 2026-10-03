@@ -41,7 +41,7 @@ else
             </div>
         </div>
         <div class="col-lg-8">
-            <ScoreBreakdownCard Breakdown="@detail.Breakdown" />
+            <ScoreBreakdownCard Breakdown="@detail.Breakdown" IsStock="@(detail.CoinType == CoinType.Stock)" />
         </div>
     </div>
 

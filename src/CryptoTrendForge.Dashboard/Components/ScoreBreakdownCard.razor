@@ -21,6 +21,7 @@
     private static readonly string[] ScoreOrder = ["trend", "rsi", "volume", "support", "oi", "pattern_bonus"];
 
     [Parameter] public Dictionary<string, int> Breakdown { get; set; } = new();
+    [Parameter] public bool IsStock { get; set; }
 
     private IEnumerable<KeyValuePair<string, int>> Ordered()
     {
@@ -32,12 +33,13 @@
             });
     }
 
-    private static int MaxFor(string key)
+    private int MaxFor(string key)
     {
         return key switch
         {
             "trend" => 25,
-            "rsi" or "volume" or "support" => 20,
+            "rsi" or "volume" => 20,
+            "support" => IsStock ? 35 : 20,
             "oi" => 15,
             "pattern_bonus" => 5,
             _ => Math.Max(1, 25)

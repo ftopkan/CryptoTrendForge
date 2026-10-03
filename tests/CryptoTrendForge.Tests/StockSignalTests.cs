@@ -255,6 +255,47 @@ public sealed class StockSignalTests
         Assert.Equal(12, score.Breakdown["trend"]);
     }
 
+    [Fact]
+    public void Engine_ScoresTheSessionHourPullbackAndIgnoresOpenInterest()
+    {
+        var engine = CreateEngine();
+        var asOf = new DateTimeOffset(2026, 9, 30, 16, 30, 0, TimeSpan.Zero);
+        var hours = new List<Kline>();
+        var open = new DateTimeOffset(2026, 9, 28, 14, 0, 0, TimeSpan.Zero);
+        var price = 120m;
+        while (hours.Count < 40)
+        {
+            if (open.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday
+                && open.Hour is >= 14 and <= 19)
+            {
+                hours.Add(new Kline
+                {
+                    OpenTime = open,
+                    Open = price,
+                    High = price + 0.4m,
+                    Low = price - 1.5m,
+                    Close = price - 1m,
+                    Volume = 100m
+                });
+                price -= 1m;
+            }
+
+            open = open.AddHours(1);
+        }
+
+        var score = engine.CalculateScore(new MarketSnapshot
+        {
+            Symbol = "AAPLUSDT",
+            CurrentPrice = price + 0.2m,
+            OpenInterestChangePct4H = 25m,
+            Klines1H = hours
+        }, asOf);
+
+        Assert.True(score.Breakdown["rsi"] >= 12);
+        Assert.False(score.Breakdown.ContainsKey("oi"));
+        Assert.DoesNotContain(score.Reasons, reason => reason.Contains("açık işlem", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static StockSignalEngine CreateEngine()
     {
         return new StockSignalEngine(
