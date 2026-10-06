@@ -57,17 +57,16 @@ public sealed class SignalEngine
         breakdown["oi"] = oiScore;
 
         var btcRelativePct = ScoreBtcRelative(snapshot, btcSnapshot, now, breakdown, reasons, risks);
-        var baseScore = trendScore + rsiScore + volumeScore + supportScore + oiScore + breakdown.GetValueOrDefault("btc_rs");
-        baseScore = Math.Clamp(baseScore, 0, 100);
-
         var patternMain = DetectMainPattern(snapshot);
         var pattern15m = _technicalAnalysisService.DetectCandlestickPattern(snapshot.Klines15M);
-        var patternBonus = _botOptions.PatternBonusEnabled && patternMain is not null
+        var patternScore = _botOptions.PatternBonusEnabled && patternMain is not null
             ? _botOptions.PatternBonusPoints
             : 0;
-        breakdown["pattern_bonus"] = patternBonus;
+        breakdown["pattern_bonus"] = patternScore;
+        var baseScore = trendScore + rsiScore + volumeScore + supportScore + oiScore + patternScore + breakdown.GetValueOrDefault("btc_rs");
+        baseScore = Math.Clamp(baseScore, 0, 100);
 
-        if (patternBonus > 0)
+        if (patternScore > 0)
         {
             reasons.Add($"Mum yapısı: {patternMain}.");
             if (supportScore >= 10)
@@ -81,8 +80,8 @@ public sealed class SignalEngine
         return new ScoreResult
         {
             BaseScore = baseScore,
-            PatternBonus = patternBonus,
-            TotalScore = baseScore + patternBonus,
+            PatternBonus = patternScore,
+            TotalScore = baseScore,
             SupportLevel = supportLevel,
             SupportDistancePct = Math.Round(supportDistancePct, 2),
             PatternName = patternMain,
@@ -296,24 +295,23 @@ public sealed class SignalEngine
         var score = 0;
         if (priceUp && snapshot.OpenInterestChangePct4H >= 1m)
         {
-            score = 15;
+            score = 10;
             reasons.Add("Fiyat ve açık işlem sayısı birlikte artıyor; yeni alım var.");
         }
         else if (priceUp && oiUp)
         {
-            score = 8;
+            score = 6;
         }
         else if (priceDown && oiDown)
         {
-            score = 8;
+            score = 6;
         }
         else if (priceUp && oiDown)
         {
-            score = 5;
+            score = 4;
         }
         else if (priceDown && oiUp)
         {
-            score = -5;
             risks.Add("Fiyat düşerken açık işlem artıyor; satış baskısı gelebilir.");
         }
 

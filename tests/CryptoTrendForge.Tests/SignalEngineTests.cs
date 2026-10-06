@@ -30,7 +30,8 @@ public sealed class SignalEngineTests
         var result = engine.CalculateScore(snapshot, MarketRegime.RiskOn);
 
         Assert.InRange(result.BaseScore, 0, 100);
-        Assert.Equal(result.BaseScore + result.PatternBonus, result.TotalScore);
+        Assert.Equal(result.BaseScore, result.TotalScore);
+        Assert.Equal(result.PatternBonus, result.Breakdown["pattern_bonus"]);
         Assert.True(result.Breakdown.ContainsKey("trend"));
         Assert.True(result.Breakdown.ContainsKey("rsi"));
         Assert.True(result.Breakdown.ContainsKey("volume"));
@@ -40,7 +41,7 @@ public sealed class SignalEngineTests
     }
 
     [Fact]
-    public void CalculateScore_UsesTheClosedFourHourPatternAndFivePointBonus()
+    public void CalculateScore_CountsTheClosedFourHourPatternInsideTheBaseScore()
     {
         var options = Options.Create(new BotOptions());
         var engine = new SignalEngine(new TechnicalAnalysisService(), options);
@@ -61,7 +62,9 @@ public sealed class SignalEngineTests
 
         var result = engine.CalculateScore(snapshot, MarketRegime.RiskOn, asOf);
 
-        Assert.Equal(5, result.PatternBonus);
+        Assert.Equal(10, result.PatternBonus);
+        Assert.Equal(10, result.Breakdown["pattern_bonus"]);
+        Assert.Equal(result.BaseScore, result.TotalScore);
         Assert.Equal("Dipten seken çekiç mum", result.PatternName);
     }
 
@@ -123,7 +126,7 @@ public sealed class SignalEngineTests
 
         var result = engine.CalculateScore(snapshot, MarketRegime.RiskOn, asOf);
 
-        Assert.Equal(15, result.Breakdown["oi"]);
+        Assert.Equal(10, result.Breakdown["oi"]);
         Assert.Contains(result.Reasons, reason => reason.Contains("açık işlem", StringComparison.Ordinal));
     }
 
@@ -148,7 +151,7 @@ public sealed class SignalEngineTests
 
         var result = engine.CalculateScore(snapshot, MarketRegime.RiskOn, asOf);
 
-        Assert.Equal(8, result.Breakdown["oi"]);
+        Assert.Equal(6, result.Breakdown["oi"]);
     }
 
     [Fact]
@@ -178,7 +181,7 @@ public sealed class SignalEngineTests
 
         var result = engine.CalculateScore(snapshot, MarketRegime.RiskOn, asOf, btc);
 
-        Assert.Equal(8, result.Breakdown["btc_rs"]);
+        Assert.Equal(10, result.Breakdown["btc_rs"]);
         Assert.Equal(10m, result.BtcRelativePct);
         Assert.Contains(result.Reasons, reason => reason.Contains("Bitcoin'den", StringComparison.Ordinal));
     }

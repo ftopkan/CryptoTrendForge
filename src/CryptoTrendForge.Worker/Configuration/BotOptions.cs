@@ -31,7 +31,7 @@ public sealed class BotOptions
     public decimal OiSpikeHardFilterPct { get; set; } = 15m;
     public decimal PriceDumpHardFilterPct { get; set; } = 8m;
     public bool PatternBonusEnabled { get; set; } = true;
-    public int PatternBonusPoints { get; set; } = 5;
+    public int PatternBonusPoints { get; set; } = 10;
     public ScoreThresholdOptions ScoreThresholds { get; set; } = new();
 }
 

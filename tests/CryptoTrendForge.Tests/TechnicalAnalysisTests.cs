@@ -227,7 +227,7 @@ public sealed class TechnicalAnalysisTests
     {
         var relative = _service.MeasureBtcRelativeStrength([100m, 110m], [100m, 100m]);
 
-        Assert.Equal(8, relative.Score);
+        Assert.Equal(10, relative.Score);
         Assert.Equal(10m, relative.Percent);
     }
 

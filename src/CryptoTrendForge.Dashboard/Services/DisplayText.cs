@@ -61,7 +61,7 @@ public static class DisplayText
             "support" => "Destek",
             "oi" => "Açık işlem",
             "btc_rs" => "Bitcoin'e göre",
-            "pattern_bonus" => "Mum bonusu",
+            "pattern_bonus" => "Mum",
             _ => key
         };
     }

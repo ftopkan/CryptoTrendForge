@@ -2,7 +2,7 @@ namespace CryptoTrendForge.Core.Domain;
 
 public static class NearMissRule
 {
-    public const int FormulaVersion = 2;
+    public const int FormulaVersion = 3;
     public const int Band = 15;
 
     public static bool ShouldRecord(int totalScore, int candidateThreshold, bool blocked)

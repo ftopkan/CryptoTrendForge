@@ -261,7 +261,9 @@ public sealed class StockSignalTests
 
         var sessionClosedAt = new DateTimeOffset(2026, 9, 30, 20, 5, 0, TimeSpan.Zero);
         Assert.Equal(0, engine.CalculateScore(overnight).PatternBonus);
-        Assert.Equal(5, engine.CalculateScore(session, sessionClosedAt).PatternBonus);
+        var sessionScore = engine.CalculateScore(session, sessionClosedAt);
+        Assert.Equal(10, sessionScore.PatternBonus);
+        Assert.Equal(sessionScore.BaseScore, sessionScore.TotalScore);
     }
 
     [Fact]

@@ -53,15 +53,15 @@ public sealed class StockSignalEngine
         var supportScore = ScoreSupport(snapshot, reasons, risks, out var supportDistancePct, out var supportLevel);
         breakdown["support"] = supportScore;
 
-        var baseScore = Math.Clamp(trendScore + rsiScore + volumeScore + supportScore, 0, 100);
         var patternMain = _technicalAnalysisService.DetectCandlestickPattern(snapshot.Klines4H);
         var pattern15m = _technicalAnalysisService.DetectCandlestickPattern(snapshot.Klines15M);
-        var patternBonus = _botOptions.PatternBonusEnabled && patternMain is not null
+        var patternScore = _botOptions.PatternBonusEnabled && patternMain is not null
             ? _botOptions.PatternBonusPoints
             : 0;
-        breakdown["pattern_bonus"] = patternBonus;
+        breakdown["pattern_bonus"] = patternScore;
+        var baseScore = Math.Clamp(trendScore + rsiScore + volumeScore + supportScore + patternScore, 0, 100);
 
-        if (patternBonus > 0)
+        if (patternScore > 0)
         {
             reasons.Add($"Mum yapısı: {patternMain}.");
             if (supportScore >= SupportNear)
@@ -73,8 +73,8 @@ public sealed class StockSignalEngine
         return new ScoreResult
         {
             BaseScore = baseScore,
-            PatternBonus = patternBonus,
-            TotalScore = baseScore + patternBonus,
+            PatternBonus = patternScore,
+            TotalScore = baseScore,
             SupportLevel = supportLevel,
             SupportDistancePct = Math.Round(supportDistancePct, 2),
             PatternName = patternMain,
@@ -253,8 +253,8 @@ public sealed class StockSignalEngine
         return score;
     }
 
-    private const int SupportMax = 35;
-    private const int SupportNear = 18;
+    private const int SupportMax = 30;
+    private const int SupportNear = 15;
 
     private static int ScaleSupport(int cryptoPoints)
     {

@@ -201,28 +201,22 @@ public sealed class TelegramService
             .Append(scoreResult.BaseScore.ToString(Turkish))
             .Append("/100");
 
-        if (scoreResult.PatternBonus > 0)
-        {
-            sb.Append(" +")
-                .Append(scoreResult.PatternBonus.ToString(Turkish))
-                .Append(" mum yapısı bonusu");
-        }
-
         sb.AppendLine();
         sb.AppendLine();
         sb.AppendLine($"📈 Trend (EMA): {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("trend"))}/25");
         sb.AppendLine($"📉 RSI: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("rsi"))}/20");
         sb.AppendLine($"🔊 Hacim: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("volume"))}/20");
-        sb.AppendLine($"🛡️ Destek: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("support"))}/{(isStock ? 35 : 20)}");
+        sb.AppendLine($"🛡️ Destek: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("support"))}/{(isStock ? 30 : 20)}");
         if (!isStock)
         {
-            sb.AppendLine($"📌 Açık işlem: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("oi"))}/15");
+            sb.AppendLine($"📌 Açık işlem: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("oi"))}/10");
             if (scoreResult.Breakdown.ContainsKey("btc_rs"))
             {
-                sb.AppendLine($"🟠 Bitcoin'e göre: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("btc_rs"))}/8");
+                sb.AppendLine($"🟠 Bitcoin'e göre: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("btc_rs"))}/10");
             }
         }
-        sb.AppendLine($"✨ Mum yapısı bonusu: {FormatPoints(scoreResult.PatternBonus)}/{_botOptions.PatternBonusPoints.ToString(Turkish)}");
+
+        sb.AppendLine($"✨ Mum: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("pattern_bonus"))}/{_botOptions.PatternBonusPoints.ToString(Turkish)}");
         sb.AppendLine();
         AppendPositionPlan(sb, plan);
         sb.AppendLine();

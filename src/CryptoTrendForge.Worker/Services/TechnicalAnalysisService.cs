@@ -157,7 +157,7 @@ public sealed class TechnicalAnalysisService
         var percent = Math.Round((coinReturn - btcReturn) * 100m, 2);
         var score = percent switch
         {
-            >= 1m => 8,
+            >= 1m => 10,
             >= 0m => 4,
             >= -0.5m => 0,
             _ => -5
