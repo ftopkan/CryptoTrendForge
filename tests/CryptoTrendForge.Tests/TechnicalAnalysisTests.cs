@@ -210,7 +210,49 @@ public sealed class TechnicalAnalysisTests
     }
 
     [Fact]
-    public void AssessHourVolumePace_WaitsForTwoClosedQuarterHours()
+    public void AssessHourVolumePace_UsesThePreviousHourBeforeTwoQuarterHoursHaveClosed()
+    {
+        var now = new DateTimeOffset(2026, 9, 30, 10, 15, 0, TimeSpan.Zero);
+        var hourOpen = CandleClock.Floor(now, TimeSpan.FromHours(1));
+        var hourly = Enumerable.Range(1, 12).Select(i => new Kline
+        {
+            OpenTime = hourOpen.AddHours(-i),
+            Open = 100m,
+            High = 100m,
+            Low = 100m,
+            Close = 100m,
+            Volume = 100m
+        }).ToArray();
+        var quarters = Enumerable.Range(0, 4).Select(i =>
+        {
+            var open = 100m + i;
+            return new Kline
+            {
+                OpenTime = hourOpen.AddHours(-1).AddMinutes(i * 15),
+                Open = open,
+                High = open + 1m,
+                Low = open,
+                Close = open + 1m,
+                Volume = 40m
+            };
+        }).Append(new Kline
+        {
+            OpenTime = hourOpen,
+            Open = 104m,
+            High = 104m,
+            Low = 90m,
+            Close = 90m,
+            Volume = 1m
+        }).ToArray();
+
+        var pace = _service.AssessHourVolumePace(hourly, quarters, baselineCandles: 10, now);
+
+        Assert.True(pace.IsReady);
+        Assert.Equal(VolumeSentiment.StrongBuying, pace.Sentiment);
+    }
+
+    [Fact]
+    public void AssessHourVolumePace_StaysUnreadyWhenThePreviousHourIsMissingToo()
     {
         var now = new DateTimeOffset(2026, 9, 30, 10, 15, 0, TimeSpan.Zero);
         var pace = _service.AssessHourVolumePace(

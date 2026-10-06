@@ -269,10 +269,30 @@ public sealed class TechnicalAnalysisService
         IReadOnlyList<Kline> fifteenMinute,
         int baselineCandles,
         DateTimeOffset now,
-        Func<Kline, bool>? includeCandle = null)
+        Func<Kline, bool>? includeCandle = null,
+        bool usePreviousHour = true)
+    {
+        var hourOpen = CandleClock.Floor(now, TimeSpan.FromHours(1));
+        var current = ScoreClosedHour(hourly, fifteenMinute, baselineCandles, hourOpen, now, now, includeCandle);
+        if (current.IsReady || !usePreviousHour)
+        {
+            return current;
+        }
+
+        var previousOpen = hourOpen.AddHours(-1);
+        return ScoreClosedHour(hourly, fifteenMinute, baselineCandles, previousOpen, hourOpen, now, includeCandle);
+    }
+
+    private static HourVolumePace ScoreClosedHour(
+        IReadOnlyList<Kline> hourly,
+        IReadOnlyList<Kline> fifteenMinute,
+        int baselineCandles,
+        DateTimeOffset hourOpen,
+        DateTimeOffset hourEnd,
+        DateTimeOffset now,
+        Func<Kline, bool>? includeCandle)
     {
         const int minimumClosedQuarterHours = 2;
-        var hourOpen = CandleClock.Floor(now, TimeSpan.FromHours(1));
         var closedHourly = CandleClock.Closed(hourly, TimeSpan.FromHours(1), now);
         var baseline = closedHourly
             .Where(x => x.OpenTime < hourOpen && (includeCandle is null || includeCandle(x)))
@@ -284,7 +304,7 @@ public sealed class TechnicalAnalysisService
             return new HourVolumePace(false, VolumeSentiment.WeakMove);
         }
 
-        var closedQuarterHours = ClosedQuarterHours(fifteenMinute, hourOpen, now, includeCandle);
+        var closedQuarterHours = ClosedQuarterHours(fifteenMinute, hourOpen, hourEnd, includeCandle);
         if (closedQuarterHours.Length < minimumClosedQuarterHours)
         {
             return new HourVolumePace(false, VolumeSentiment.WeakMove);

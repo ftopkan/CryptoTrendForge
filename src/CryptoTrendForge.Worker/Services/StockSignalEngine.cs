@@ -143,7 +143,8 @@ public sealed class StockSignalEngine
             snapshot.Klines15M,
             _botOptions.VolumeBaselineCandles,
             now,
-            candle => UsEquitySession.IsOpen(candle.OpenTime, _stockOptions));
+            candle => UsEquitySession.IsOpen(candle.OpenTime, _stockOptions),
+            usePreviousHour: !UsEquitySession.IsOpeningVolumeInterval(now, _stockOptions));
         if (!pace.IsReady)
         {
             pace = AssessOpeningVolume(snapshot.Klines15M, now);
