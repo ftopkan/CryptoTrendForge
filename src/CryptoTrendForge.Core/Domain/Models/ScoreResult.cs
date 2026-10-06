@@ -9,6 +9,7 @@ public sealed class ScoreResult
     public decimal SupportDistancePct { get; set; }
     public decimal? Rsi4H { get; set; }
     public decimal? Ema20ExtensionPct { get; set; }
+    public decimal? BtcRelativePct { get; set; }
     public string? PatternName { get; set; }
     public string? PatternName15m { get; set; }
     public Dictionary<string, int> Breakdown { get; set; } = new();

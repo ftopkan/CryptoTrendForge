@@ -28,7 +28,7 @@ public sealed class ExitTargetEvaluatorTests
 
         Assert.Equal(101m, plan.Entry);
         Assert.Equal("desteğe çekilince", plan.EntryNote);
-        Assert.Equal(97m, plan.Stop);
+        Assert.Equal(98m, plan.Stop);
     }
 
     [Fact]
@@ -149,6 +149,39 @@ public sealed class ExitTargetEvaluatorTests
 
         Assert.Null(signal.StopMinutes);
         Assert.Null(signal.CautiousMinutes);
+    }
+
+    [Fact]
+    public void Apply_ClosesThePlanWhenBitcoinDropsAndIgnoresLaterCoinHighs()
+    {
+        var signal = NewSignal();
+        signal.BtcEntryPrice = 100m;
+        signal.WideExit = 112m;
+        var coin = new[]
+        {
+            Candle(CreatedAt.AddMinutes(15), high: 103m, low: 99m),
+            Candle(CreatedAt.AddMinutes(45), high: 120m, low: 99m)
+        };
+        var btc = new[]
+        {
+            Candle(CreatedAt.AddMinutes(30), high: 100m, low: 96m)
+        };
+
+        ExitTargetEvaluator.Apply(signal, coin, CreatedAt.AddHours(1), btcKlines: btc);
+
+        Assert.Equal(15, signal.CautiousMinutes);
+        Assert.Null(signal.WideMinutes);
+        Assert.Equal(ExitTargetEvaluator.BtcBreakReason, signal.TargetsCloseReason);
+        Assert.NotNull(signal.TargetsClosedAt);
+    }
+
+    [Fact]
+    public void Create_StoresTheBitcoinPriceAndCoinRatio()
+    {
+        var plan = PositionPlan.Create(100m, 99m, 50000m);
+
+        Assert.Equal(50000m, plan.BtcEntryPrice);
+        Assert.Equal(0.002m, plan.CoinBtcRatio);
     }
 
     [Fact]

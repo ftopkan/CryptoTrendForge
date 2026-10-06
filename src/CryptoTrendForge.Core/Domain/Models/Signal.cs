@@ -36,6 +36,8 @@ public sealed class Signal
     public string? Pattern1H4H { get; set; }
     public string? Pattern15M { get; set; }
     public string? BtcTrend { get; set; }
+    public decimal? BtcEntryPrice { get; set; }
+    public string? TargetsCloseReason { get; set; }
     public JsonDocument? ScoreBreakdown { get; set; }
     public JsonDocument? Reasons { get; set; }
     public JsonDocument? Risks { get; set; }

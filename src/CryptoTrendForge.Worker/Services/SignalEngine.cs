@@ -1,3 +1,4 @@
+using System.Globalization;
 using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Domain.Models;
@@ -19,7 +20,11 @@ public sealed class SignalEngine
         _botOptions = botOptions.Value;
     }
 
-    public ScoreResult CalculateScore(MarketSnapshot snapshot, MarketRegime regime, DateTimeOffset? asOf = null)
+    public ScoreResult CalculateScore(
+        MarketSnapshot snapshot,
+        MarketRegime regime,
+        DateTimeOffset? asOf = null,
+        BtcSnapshot? btcSnapshot = null)
     {
         var now = asOf ?? DateTimeOffset.UtcNow;
         snapshot = WithClosedStructure(snapshot, now);
@@ -51,7 +56,8 @@ public sealed class SignalEngine
         var oiScore = ScoreOpenInterest(snapshot, reasons, risks);
         breakdown["oi"] = oiScore;
 
-        var baseScore = trendScore + rsiScore + volumeScore + supportScore + oiScore;
+        var btcRelativePct = ScoreBtcRelative(snapshot, btcSnapshot, now, breakdown, reasons, risks);
+        var baseScore = trendScore + rsiScore + volumeScore + supportScore + oiScore + breakdown.GetValueOrDefault("btc_rs");
         baseScore = Math.Clamp(baseScore, 0, 100);
 
         var patternMain = DetectMainPattern(snapshot);
@@ -64,7 +70,7 @@ public sealed class SignalEngine
         if (patternBonus > 0)
         {
             reasons.Add($"Mum yapısı: {patternMain}.");
-            if (supportScore >= 13)
+            if (supportScore >= 10)
             {
                 reasons.Add($"Destekte bu mum yapısı var: {patternMain}. Dönüş ihtimali artıyor.");
             }
@@ -83,6 +89,7 @@ public sealed class SignalEngine
             PatternName15m = pattern15m,
             Rsi4H = rsi4h,
             Ema20ExtensionPct = ema20ExtensionPct,
+            BtcRelativePct = btcRelativePct,
             Breakdown = breakdown,
             Reasons = reasons,
             Risks = risks,
@@ -96,9 +103,49 @@ public sealed class SignalEngine
                 supportLevel,
                 supportDistancePct,
                 rsi4h,
-                ema20ExtensionPct
+                ema20ExtensionPct,
+                btcRelativePct
             }
         };
+    }
+
+    private decimal? ScoreBtcRelative(
+        MarketSnapshot snapshot,
+        BtcSnapshot? btcSnapshot,
+        DateTimeOffset now,
+        Dictionary<string, int> breakdown,
+        List<string> reasons,
+        List<string> risks)
+    {
+        if (btcSnapshot is null)
+        {
+            return null;
+        }
+
+        var closedBtc = CandleClock.Closed(btcSnapshot.Klines4H, TimeSpan.FromHours(4), now);
+        var relative = _technicalAnalysisService.MeasureBtcRelativeStrength(
+            snapshot.Klines4H.Select(x => x.Close).ToArray(),
+            closedBtc.Select(x => x.Close).ToArray());
+        breakdown["btc_rs"] = relative.Score;
+        if (relative.Percent is >= 1m)
+        {
+            reasons.Add($"Son 4 saatlik kapanışta Bitcoin'den {FormatSignedPercent(relative.Percent.Value)} önde.");
+        }
+        else if (relative.Percent is >= 0m)
+        {
+            reasons.Add("Son 4 saatlik kapanışta Bitcoin ile birlikte veya hafif önde.");
+        }
+        else if (relative.Percent is < -0.5m)
+        {
+            risks.Add($"Son 4 saatlik kapanışta Bitcoin'den {FormatSignedPercent(relative.Percent.Value)} geride; piyasa baskısına karşı kırılgan.");
+        }
+
+        return relative.Percent;
+    }
+
+    private static string FormatSignedPercent(decimal value)
+    {
+        return "%" + Math.Abs(value).ToString("0.##", CultureInfo.GetCultureInfo("tr-TR"));
     }
 
     private int ScoreTrend(MarketSnapshot snapshot, out bool isBearAligned, out string? reason, out decimal? ema20ExtensionPct)
@@ -206,18 +253,14 @@ public sealed class SignalEngine
         }
         else if (supportDistancePct <= 3m)
         {
-            score = 13;
-        }
-        else if (supportDistancePct <= 5m)
-        {
-            score = 5;
+            score = 10;
         }
         else
         {
             score = 0;
         }
 
-        if (score >= 13)
+        if (score >= 10)
         {
             reasons.Add("Fiyat desteğe yakın.");
         }
@@ -251,10 +294,14 @@ public sealed class SignalEngine
         var oiDown = snapshot.OpenInterestChangePct4H < 0m;
 
         var score = 0;
-        if (priceUp && oiUp)
+        if (priceUp && snapshot.OpenInterestChangePct4H >= 1m)
         {
             score = 15;
             reasons.Add("Fiyat ve açık işlem sayısı birlikte artıyor; yeni alım var.");
+        }
+        else if (priceUp && oiUp)
+        {
+            score = 8;
         }
         else if (priceDown && oiDown)
         {

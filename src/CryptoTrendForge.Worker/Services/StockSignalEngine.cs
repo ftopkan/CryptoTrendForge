@@ -232,11 +232,7 @@ public sealed class StockSignalEngine
         }
         else if (supportDistancePct <= 3m)
         {
-            score = ScaleSupport(13);
-        }
-        else if (supportDistancePct <= 5m)
-        {
-            score = ScaleSupport(5);
+            score = ScaleSupport(10);
         }
         else
         {
@@ -258,7 +254,7 @@ public sealed class StockSignalEngine
     }
 
     private const int SupportMax = 35;
-    private const int SupportNear = 23;
+    private const int SupportNear = 18;
 
     private static int ScaleSupport(int cryptoPoints)
     {

@@ -60,6 +60,14 @@ else
                         <tr><td>Temkinli</td><td class="num font-monospace">@FormatPrice(detail.CautiousExit)</td><td><TargetCell BadgeOnly="true" Minutes="@detail.CautiousMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
                         <tr><td>Dengeli</td><td class="num font-monospace">@FormatPrice(detail.BalancedExit)</td><td><TargetCell BadgeOnly="true" Minutes="@detail.BalancedMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
                         <tr><td>Geniş</td><td class="num font-monospace">@FormatPrice(detail.WideExit)</td><td><TargetCell BadgeOnly="true" Minutes="@detail.WideMinutes" ClosedAt="@detail.TargetsClosedAt" /></td></tr>
+                        @if (!string.IsNullOrWhiteSpace(detail.TargetsCloseReason))
+                        {
+                            <tr><td>Kapanış</td><td colspan="2">@detail.TargetsCloseReason</td></tr>
+                        }
+                        @if (detail.BtcEntryPrice is decimal btcEntry)
+                        {
+                            <tr><td>BTC giriş</td><td class="num font-monospace" colspan="2">@FormatPrice(btcEntry)</td></tr>
+                        }
                     </tbody>
                 </table>
             </div>

@@ -65,6 +65,8 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.Pattern1H4H).HasMaxLength(50);
             entity.Property(x => x.Pattern15M).HasMaxLength(50);
             entity.Property(x => x.BtcTrend).HasMaxLength(10);
+            entity.Property(x => x.BtcEntryPrice).HasColumnType("numeric(18,8)");
+            entity.Property(x => x.TargetsCloseReason).HasMaxLength(40);
             entity.Property(x => x.ScoreBreakdown)
                 .HasConversion(jsonDocumentConverter)
                 .HasColumnType(jsonType);

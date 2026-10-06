@@ -149,7 +149,7 @@ public sealed class TechnicalAnalysisTests
     public void AssessHourVolumePace_ScoresBuyingWhenTheHourHasAlreadyBeatenItsShare()
     {
         var now = new DateTimeOffset(2026, 9, 30, 10, 30, 0, TimeSpan.Zero);
-        var quarters = QuarterHours(now, 30m, 30m);
+        var quarters = QuarterHours(now, 40m, 40m);
         quarters[0].Close = 104m;
         quarters[1].Open = 104m;
         quarters[1].Close = 108m;
@@ -161,6 +161,24 @@ public sealed class TechnicalAnalysisTests
 
         Assert.True(pace.IsReady);
         Assert.Equal(VolumeSentiment.StrongBuying, pace.Sentiment);
+    }
+
+    [Fact]
+    public void AssessHourVolumePace_DoesNotGiveFullBuyingForMerelyMeetingTheShare()
+    {
+        var now = new DateTimeOffset(2026, 9, 30, 10, 30, 0, TimeSpan.Zero);
+        var quarters = QuarterHours(now, 30m, 30m);
+        quarters[0].Close = 104m;
+        quarters[1].Open = 104m;
+        quarters[1].Close = 108m;
+        var pace = _service.AssessHourVolumePace(
+            Hourly(now, volume: 100m, close: 100m),
+            quarters,
+            baselineCandles: 10,
+            now);
+
+        Assert.True(pace.IsReady);
+        Assert.Equal(VolumeSentiment.Accumulation, pace.Sentiment);
     }
 
     [Fact]
@@ -202,6 +220,33 @@ public sealed class TechnicalAnalysisTests
             now);
 
         Assert.False(pace.IsReady);
+    }
+
+    [Fact]
+    public void MeasureBtcRelativeStrength_RewardsACoinThatBeatBitcoin()
+    {
+        var relative = _service.MeasureBtcRelativeStrength([100m, 110m], [100m, 100m]);
+
+        Assert.Equal(8, relative.Score);
+        Assert.Equal(10m, relative.Percent);
+    }
+
+    [Fact]
+    public void MeasureBtcRelativeStrength_PenalizesACoinThatLaggedBitcoin()
+    {
+        var relative = _service.MeasureBtcRelativeStrength([100m, 100m], [100m, 102m]);
+
+        Assert.Equal(-5, relative.Score);
+        Assert.Equal(-2m, relative.Percent);
+    }
+
+    [Fact]
+    public void MeasureBtcRelativeStrength_StaysFlatInsideTheNeutralBand()
+    {
+        var relative = _service.MeasureBtcRelativeStrength([100m, 100m], [100m, 100.2m]);
+
+        Assert.Equal(0, relative.Score);
+        Assert.Equal(-0.2m, relative.Percent);
     }
 
     [Fact]

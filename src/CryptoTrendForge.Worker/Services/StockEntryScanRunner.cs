@@ -62,6 +62,7 @@ public sealed class StockEntryScanRunner
         var bestScore = 0;
         string? bestSymbol = null;
         var topScores = new List<(string Symbol, int Score)>();
+        var pendingSignals = new List<(Signal Signal, ScoreResult Score, MarketSnapshot Snapshot)>();
         foreach (var stock in stocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -143,17 +144,26 @@ public sealed class StockEntryScanRunner
                 snapshot.FundingRate,
                 null,
                 now.AddHours(_botOptions.CooldownHours),
-                cancellationToken);
-
-            var sent = await _telegramService.SendSignalAsync(signal, scoreResult, snapshot, CoinType.Stock, cancellationToken);
-            if (sent)
-            {
-                await _signalRepository.ActivateSignalAsync(signal.Id, cancellationToken);
-                _marketDataCache.Set($"active_signal:{stock.Symbol}".ToLowerInvariant(), true, TimeSpan.FromHours(_botOptions.CooldownHours));
-            }
+                cancellationToken: cancellationToken);
+            pendingSignals.Add((signal, scoreResult, snapshot));
         }
 
         var top3 = topScores.OrderByDescending(x => x.Score).Take(3).ToList();
+        foreach (var pending in pendingSignals)
+        {
+            var sent = await _telegramService.SendSignalAsync(
+                pending.Signal,
+                pending.Score,
+                pending.Snapshot,
+                CoinType.Stock,
+                leaders: top3,
+                cancellationToken: cancellationToken);
+            if (sent)
+            {
+                await _signalRepository.ActivateSignalAsync(pending.Signal.Id, cancellationToken);
+                _marketDataCache.Set($"active_signal:{pending.Snapshot.Symbol}".ToLowerInvariant(), true, TimeSpan.FromHours(_botOptions.CooldownHours));
+            }
+        }
         var top3Lines = top3.Count == 0
             ? "• (puan yok)"
             : string.Join("\n", top3.Select(x => $"• {x.Symbol}: {x.Score}"));

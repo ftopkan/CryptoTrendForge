@@ -6,6 +6,8 @@ namespace CryptoTrendForge.Worker.Services;
 
 public readonly record struct TrendAssessment(int Score, bool IsBearAligned, string? Reason, decimal? Ema20ExtensionPct = null);
 
+public readonly record struct BtcRelativeStrength(int Score, decimal? Percent);
+
 public readonly record struct HourVolumePace(bool IsReady, VolumeSentiment Sentiment);
 
 public sealed class TechnicalAnalysisService
@@ -135,6 +137,33 @@ public sealed class TechnicalAnalysisService
 
     public static int ResolveTrendLongEmaPeriod(int closedBarCount) =>
         closedBarCount >= TrendLongEmaPeriodExtended ? TrendLongEmaPeriodExtended : TrendMinBarsFull;
+
+    public BtcRelativeStrength MeasureBtcRelativeStrength(IReadOnlyList<decimal> coinCloses, IReadOnlyList<decimal> btcCloses)
+    {
+        if (coinCloses.Count < 2 || btcCloses.Count < 2)
+        {
+            return new BtcRelativeStrength(0, null);
+        }
+
+        var coinPrevious = coinCloses[^2];
+        var btcPrevious = btcCloses[^2];
+        if (coinPrevious <= 0m || btcPrevious <= 0m)
+        {
+            return new BtcRelativeStrength(0, null);
+        }
+
+        var coinReturn = (coinCloses[^1] - coinPrevious) / coinPrevious;
+        var btcReturn = (btcCloses[^1] - btcPrevious) / btcPrevious;
+        var percent = Math.Round((coinReturn - btcReturn) * 100m, 2);
+        var score = percent switch
+        {
+            >= 1m => 8,
+            >= 0m => 4,
+            >= -0.5m => 0,
+            _ => -5
+        };
+        return new BtcRelativeStrength(score, percent);
+    }
 
     public decimal[] FindSwingLows(IEnumerable<Kline> klines, int lookback, int neighborCount)
     {
@@ -346,14 +375,20 @@ public sealed class TechnicalAnalysisService
 
     private static HourVolumePace PaceFromClosedWindow(IReadOnlyList<Kline> closedQuarterHours, decimal actualVolume, decimal requiredVolume)
     {
+        var volumeStrong = actualVolume >= requiredVolume * 1.5m;
         var volumeUp = actualVolume >= requiredVolume;
         var volumeDown = actualVolume < requiredVolume;
         var priceUp = closedQuarterHours[^1].Close > closedQuarterHours[0].Open;
         var priceDown = closedQuarterHours[^1].Close < closedQuarterHours[0].Open;
 
-        if (priceUp && volumeUp)
+        if (priceUp && volumeStrong)
         {
             return new HourVolumePace(true, VolumeSentiment.StrongBuying);
+        }
+
+        if (priceUp && volumeUp)
+        {
+            return new HourVolumePace(true, VolumeSentiment.Accumulation);
         }
 
         if (!priceUp && !priceDown && volumeUp)

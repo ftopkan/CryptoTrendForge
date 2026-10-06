@@ -1,10 +1,11 @@
 @page "/exits"
+@using CryptoTrendForge.Core.Domain
 @inject DashboardDataService DataService
 @inject DashboardSession Session
 
 <div class="mb-3">
     <h1 class="h3 mb-0">Çıkışlar</h1>
-    <p class="page-lead text-secondary mb-0">Giriş, stop ve hedefler. Saat Türkiye saatidir.</p>
+    <p class="page-lead text-secondary mb-0">Hedefe varan ve varmayan planların puan kalemleri. Saat Türkiye saatidir.</p>
 </div>
 
 @if (!Session.IsAuthenticated)
@@ -23,6 +24,14 @@ else
                 <div class="col-md-3">
                     <label class="form-label">Bitiş</label>
                     <input class="form-control" type="date" @bind="toDate" @bind:format="yyyy-MM-dd" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Sonuç</label>
+                    <select class="form-select" @bind="resultFilter">
+                        <option value="all">Tümü</option>
+                        <option value="hit">Temkinli hedefi tutan</option>
+                        <option value="miss">Temkinli hedefi tutmayan</option>
+                    </select>
                 </div>
                 <div class="col-md-2">
                     <button class="btn btn-primary" @onclick="Load">Uygula</button>
@@ -44,9 +53,35 @@ else
                     <RateBar Label="Temkinli" Percent="@cautiousRate" Value="@($"{cautiousRate}%")" />
                     <RateBar Label="Dengeli" Percent="@balancedRate" Value="@($"{balancedRate}%")" />
                     <RateBar Label="Geniş" Percent="@wideRate" Value="@($"{wideRate}%")" />
+                    <p class="text-secondary small mb-0 mt-2">Bitcoin bozduğu için kapanan: @btcBrokenCount. Bu planlar başarı oranının dışında.</p>
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        @foreach (var group in ScoreComparisons())
+        {
+            <div class="col-lg-6">
+                <div class="card border-secondary-subtle h-100">
+                    <div class="card-header">@group.Title · tutan @group.Hits / tutmayan @group.Misses</div>
+                    <div class="card-body">
+                        @if (group.Hits + group.Misses == 0)
+                        {
+                            <p class="text-secondary mb-0">Bu aralıkta kapanmış plan yok.</p>
+                        }
+                        else
+                        {
+                            <div class="d-flex text-secondary small mb-1"><span class="rate-label">Kalem</span><span class="rate-value">Tutan</span><span class="rate-value">Tutmayan</span></div>
+                            @foreach (var part in group.Parts)
+                            {
+                                <div class="d-flex mb-1"><span class="rate-label">@part.Label</span><span class="rate-value">@part.Hit</span><span class="rate-value">@part.Miss</span></div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 
     <div class="card border-secondary-subtle">
@@ -56,6 +91,13 @@ else
                     <tr>
                         <th>Saat (TSİ)</th>
                         <th>Sembol</th>
+                        <th class="num">Skor</th>
+                        <th class="num">Trend</th>
+                        <th class="num">RSI</th>
+                        <th class="num">Hacim</th>
+                        <th class="num">Destek</th>
+                        <th class="num">Açık işlem</th>
+                        <th class="num">BTC</th>
                         <th class="num">Giriş</th>
                         <th>Stop</th>
                         <th>Temkinli</th>
@@ -64,15 +106,22 @@ else
                     </tr>
                 </thead>
                 <tbody>
-                    @if (rows.Count == 0)
+                    @if (VisibleRows.Count == 0)
                     {
-                        <tr class="empty-row"><td colspan="7" class="text-secondary">Bu aralıkta çıkış planı olan sinyal yok.</td></tr>
+                        <tr class="empty-row"><td colspan="14" class="text-secondary">Bu aralıkta gösterilecek plan yok.</td></tr>
                     }
-                    @foreach (var row in rows)
+                    @foreach (var row in VisibleRows)
                     {
                         <tr>
                             <td class="text-nowrap">@DisplayText.TurkeyTime(row.CreatedAt)</td>
                             <td><a class="fw-semibold" href="/signals/@row.Id">@row.Symbol</a> <span class="badge text-bg-secondary ms-1">@(row.CoinType == CoinType.Stock ? "Hisse" : "Kripto")</span></td>
+                            <td class="num">@row.TotalScore.ToString("0")</td>
+                            <td class="num">@Part(row, "trend")</td>
+                            <td class="num">@Part(row, "rsi")</td>
+                            <td class="num">@Part(row, "volume")</td>
+                            <td class="num">@Part(row, "support")</td>
+                            <td class="num">@Part(row, "oi")</td>
+                            <td class="num">@Part(row, "btc_rs")</td>
                             <td class="num font-monospace">@FormatPrice(row.EntryPrice)</td>
                             <td><TargetCell Price="@row.StopPrice" Minutes="@row.StopMinutes" ClosedAt="@row.TargetsClosedAt" /></td>
                             <td><TargetCell Price="@row.CautiousExit" Minutes="@row.CautiousMinutes" ClosedAt="@row.TargetsClosedAt" /></td>
@@ -87,14 +136,44 @@ else
 }
 
 @code {
+    private static readonly (string Key, string Label)[] CryptoParts =
+    [
+        ("trend", "Trend"),
+        ("rsi", "RSI"),
+        ("volume", "Hacim"),
+        ("support", "Destek"),
+        ("oi", "Açık işlem"),
+        ("btc_rs", "Bitcoin'e göre"),
+        ("pattern_bonus", "Mum")
+    ];
+
+    private static readonly (string Key, string Label)[] StockParts =
+    [
+        ("trend", "Trend"),
+        ("rsi", "RSI"),
+        ("volume", "Hacim"),
+        ("support", "Destek"),
+        ("pattern_bonus", "Mum")
+    ];
+
     private DateTime? fromDate;
     private DateTime? toDate;
+    private string resultFilter = "all";
     private IReadOnlyList<ExitTargetRow> rows = [];
 
+    private IReadOnlyList<ExitTargetRow> VisibleRows => resultFilter switch
+    {
+        "hit" => rows.Where(x => x.CautiousMinutes is not null).ToList(),
+        "miss" => rows.Where(x => x.TargetsClosedAt is not null && x.TargetsCloseReason != ExitTargetEvaluator.BtcBreakReason && x.CautiousMinutes is null).ToList(),
+        _ => rows
+    };
+
     private int closedCount => rows.Count(x => x.TargetsClosedAt is not null);
-    private decimal cautiousRate => HitRate(rows.Count(x => x.TargetsClosedAt is not null && x.CautiousMinutes is not null));
-    private decimal balancedRate => HitRate(rows.Count(x => x.TargetsClosedAt is not null && x.BalancedMinutes is not null));
-    private decimal wideRate => HitRate(rows.Count(x => x.TargetsClosedAt is not null && x.WideMinutes is not null));
+    private int btcBrokenCount => rows.Count(x => x.TargetsCloseReason == ExitTargetEvaluator.BtcBreakReason);
+    private int scoredCount => closedCount - btcBrokenCount;
+    private decimal cautiousRate => HitRate(rows.Count(x => x.TargetsClosedAt is not null && x.TargetsCloseReason != ExitTargetEvaluator.BtcBreakReason && x.CautiousMinutes is not null));
+    private decimal balancedRate => HitRate(rows.Count(x => x.TargetsClosedAt is not null && x.TargetsCloseReason != ExitTargetEvaluator.BtcBreakReason && x.BalancedMinutes is not null));
+    private decimal wideRate => HitRate(rows.Count(x => x.TargetsClosedAt is not null && x.TargetsCloseReason != ExitTargetEvaluator.BtcBreakReason && x.WideMinutes is not null));
 
     protected override async Task OnInitializedAsync()
     {
@@ -111,12 +190,12 @@ else
 
     private decimal HitRate(int hits)
     {
-        if (closedCount == 0)
+        if (scoredCount == 0)
         {
             return 0m;
         }
 
-        return Math.Round((decimal)hits * 100m / closedCount, 2);
+        return Math.Round((decimal)hits * 100m / scoredCount, 2);
     }
 
     private static DateTimeOffset? ToUtcStart(DateTime? date)
@@ -137,6 +216,64 @@ else
         }
 
         return new DateTimeOffset(DateTime.SpecifyKind(date.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc));
+    }
+
+    private IReadOnlyList<ScoreGroup> ScoreComparisons()
+    {
+        return
+        [
+            Compare("Kripto", CoinType.Crypto, CryptoParts),
+            Compare("Hisse", CoinType.Stock, StockParts)
+        ];
+    }
+
+    private ScoreGroup Compare(string title, CoinType coinType, (string Key, string Label)[] parts)
+    {
+        var closed = rows.Where(x => x.CoinType == coinType && x.TargetsClosedAt is not null && x.TargetsCloseReason != ExitTargetEvaluator.BtcBreakReason).ToList();
+        var hits = closed.Where(x => x.CautiousMinutes is not null).ToList();
+        var misses = closed.Where(x => x.CautiousMinutes is null).ToList();
+        return new ScoreGroup
+        {
+            Title = title,
+            Hits = hits.Count,
+            Misses = misses.Count,
+            Parts = parts.Select(part => new ScorePart
+            {
+                Label = part.Label,
+                Hit = Average(hits, part.Key),
+                Miss = Average(misses, part.Key)
+            }).ToList()
+        };
+    }
+
+    private static string Average(IReadOnlyList<ExitTargetRow> source, string key)
+    {
+        var values = source
+            .Select(row => row.Breakdown.TryGetValue(key, out var value) ? value : (int?)null)
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToList();
+        return values.Count == 0 ? "—" : Math.Round((decimal)values.Average(), 1).ToString("0.#");
+    }
+
+    private static string Part(ExitTargetRow row, string key)
+    {
+        return row.Breakdown.TryGetValue(key, out var value) ? value.ToString() : "—";
+    }
+
+    private sealed class ScoreGroup
+    {
+        public string Title { get; init; } = string.Empty;
+        public int Hits { get; init; }
+        public int Misses { get; init; }
+        public List<ScorePart> Parts { get; init; } = [];
+    }
+
+    private sealed class ScorePart
+    {
+        public string Label { get; init; } = string.Empty;
+        public string Hit { get; init; } = "—";
+        public string Miss { get; init; } = "—";
     }
 
     private static string FormatPrice(decimal? value)

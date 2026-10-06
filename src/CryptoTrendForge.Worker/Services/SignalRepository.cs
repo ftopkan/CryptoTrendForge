@@ -104,6 +104,7 @@ public sealed class SignalRepository
         decimal fundingRate,
         string? btcTrend,
         DateTimeOffset expiresAt,
+        decimal? btcPrice = null,
         CancellationToken cancellationToken = default)
     {
         var signal = new Signal
@@ -132,8 +133,9 @@ public sealed class SignalRepository
             ExpiresAt = expiresAt
         };
 
-        var plan = PositionPlan.Create(signalPrice, supportLevel);
+        var plan = PositionPlan.Create(signalPrice, supportLevel, btcPrice);
         signal.EntryPrice = plan.Entry;
+        signal.BtcEntryPrice = plan.BtcEntryPrice;
         signal.StopPrice = plan.Stop;
         signal.CautiousExit = plan.CautiousExit;
         signal.BalancedExit = plan.BalancedExit;

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Enums;
 using CryptoTrendForge.Core.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
@@ -123,6 +124,8 @@ public sealed class DashboardDataService
             WideExit = signal.WideExit,
             WideMinutes = signal.WideMinutes,
             TargetsClosedAt = signal.TargetsClosedAt,
+            TargetsCloseReason = signal.TargetsCloseReason,
+            BtcEntryPrice = signal.BtcEntryPrice,
             SupportLevel = signal.SupportLevel,
             SupportDistPct = signal.SupportDistPct,
             FundingRate = signal.FundingRate,
@@ -166,27 +169,32 @@ public sealed class DashboardDataService
             query = query.Where(x => x.CreatedAt <= toUtc.Value);
         }
 
-        return await query
+        var signals = await query
+            .Include(x => x.Coin)
             .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new ExitTargetRow
-            {
-                Id = x.Id,
-                Symbol = x.Coin != null ? x.Coin.Symbol : "?",
-                CoinType = x.Coin != null ? x.Coin.CoinType : CoinType.Crypto,
-                CreatedAt = x.CreatedAt,
-                EntryPrice = x.EntryPrice,
-                StopPrice = x.StopPrice,
-                StopMinutes = x.StopMinutes,
-                CautiousExit = x.CautiousExit,
-                CautiousMinutes = x.CautiousMinutes,
-                BalancedExit = x.BalancedExit,
-                BalancedMinutes = x.BalancedMinutes,
-                WideExit = x.WideExit,
-                WideMinutes = x.WideMinutes,
-                TargetsClosedAt = x.TargetsClosedAt
-            })
             .Take(500)
             .ToListAsync(cancellationToken);
+
+        return signals.Select(x => new ExitTargetRow
+        {
+            Id = x.Id,
+            Symbol = x.Coin != null ? x.Coin.Symbol : "?",
+            CoinType = x.Coin != null ? x.Coin.CoinType : CoinType.Crypto,
+            CreatedAt = x.CreatedAt,
+            TotalScore = x.TotalScore,
+            Breakdown = ParseBreakdown(x.ScoreBreakdown),
+            EntryPrice = x.EntryPrice,
+            StopPrice = x.StopPrice,
+            StopMinutes = x.StopMinutes,
+            CautiousExit = x.CautiousExit,
+            CautiousMinutes = x.CautiousMinutes,
+            BalancedExit = x.BalancedExit,
+            BalancedMinutes = x.BalancedMinutes,
+            WideExit = x.WideExit,
+            WideMinutes = x.WideMinutes,
+            TargetsClosedAt = x.TargetsClosedAt,
+            TargetsCloseReason = x.TargetsCloseReason
+        }).ToList();
     }
 
     public async Task<PerformanceSnapshot> GetPerformanceAsync(CancellationToken cancellationToken = default)
@@ -263,17 +271,20 @@ public sealed class DashboardDataService
             {
                 x.CautiousReachedAt,
                 x.BalancedReachedAt,
-                x.WideReachedAt
+                x.WideReachedAt,
+                x.TargetsCloseReason
             })
             .ToListAsync(cancellationToken);
 
-        var total = closed.Count;
+        var scored = closed.Where(x => x.TargetsCloseReason != ExitTargetEvaluator.BtcBreakReason).ToList();
+        var total = scored.Count;
         return new ExitTargetSummary
         {
-            ClosedSignals = total,
-            CautiousHitRatePct = HitRate(closed.Count(x => x.CautiousReachedAt != null), total),
-            BalancedHitRatePct = HitRate(closed.Count(x => x.BalancedReachedAt != null), total),
-            WideHitRatePct = HitRate(closed.Count(x => x.WideReachedAt != null), total)
+            ClosedSignals = closed.Count,
+            BtcBrokenSignals = closed.Count - total,
+            CautiousHitRatePct = HitRate(scored.Count(x => x.CautiousReachedAt != null), total),
+            BalancedHitRatePct = HitRate(scored.Count(x => x.BalancedReachedAt != null), total),
+            WideHitRatePct = HitRate(scored.Count(x => x.WideReachedAt != null), total)
         };
     }
 
@@ -423,6 +434,8 @@ public sealed class SignalDetailView
     public decimal? WideExit { get; set; }
     public int? WideMinutes { get; set; }
     public DateTimeOffset? TargetsClosedAt { get; set; }
+    public string? TargetsCloseReason { get; set; }
+    public decimal? BtcEntryPrice { get; set; }
     public decimal SupportLevel { get; set; }
     public decimal SupportDistPct { get; set; }
     public decimal FundingRate { get; set; }
@@ -465,6 +478,8 @@ public sealed class ExitTargetRow
     public string Symbol { get; set; } = string.Empty;
     public CoinType CoinType { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public decimal TotalScore { get; set; }
+    public Dictionary<string, int> Breakdown { get; set; } = new();
     public decimal? EntryPrice { get; set; }
     public decimal? StopPrice { get; set; }
     public int? StopMinutes { get; set; }
@@ -475,11 +490,13 @@ public sealed class ExitTargetRow
     public decimal? WideExit { get; set; }
     public int? WideMinutes { get; set; }
     public DateTimeOffset? TargetsClosedAt { get; set; }
+    public string? TargetsCloseReason { get; set; }
 }
 
 public sealed class ExitTargetSummary
 {
     public int ClosedSignals { get; set; }
+    public int BtcBrokenSignals { get; set; }
     public decimal CautiousHitRatePct { get; set; }
     public decimal BalancedHitRatePct { get; set; }
     public decimal WideHitRatePct { get; set; }

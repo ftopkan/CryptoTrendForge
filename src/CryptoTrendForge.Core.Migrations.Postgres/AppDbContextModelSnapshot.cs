@@ -153,6 +153,9 @@ namespace CryptoTrendForge.Core.Migrations.Postgres
                     b.Property<DateTimeOffset?>("BalancedReachedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal?>("BtcEntryPrice")
+                        .HasColumnType("numeric(18,8)");
+
                     b.Property<string>("BtcTrend")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
@@ -251,6 +254,10 @@ namespace CryptoTrendForge.Core.Migrations.Postgres
 
                     b.Property<decimal>("SupportLevel")
                         .HasColumnType("numeric(18,8)");
+
+                    b.Property<string>("TargetsCloseReason")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<DateTimeOffset?>("TargetsClosedAt")
                         .HasColumnType("timestamp with time zone");

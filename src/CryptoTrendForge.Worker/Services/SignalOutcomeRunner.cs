@@ -1,5 +1,6 @@
 using CryptoTrendForge.Core.Domain;
 using CryptoTrendForge.Core.Domain.Enums;
+using CryptoTrendForge.Core.Domain.Models;
 using CryptoTrendForge.Worker.Configuration;
 using Microsoft.Extensions.Options;
 
@@ -84,6 +85,11 @@ public sealed class SignalOutcomeRunner
         var now = DateTimeOffset.UtcNow;
         var pending = await _signalRepository.GetSignalsPendingExitEvaluationAsync(now, cancellationToken);
         var changed = false;
+        IReadOnlyList<Kline>? btcKlines = null;
+        if (pending.Any(x => x.BtcEntryPrice is > 0m && x.Coin?.CoinType == CoinType.Crypto))
+        {
+            btcKlines = await _bybitService.GetKlinesAsync("BTCUSDT", "15", 200, cancellationToken);
+        }
 
         foreach (var signal in pending)
         {
@@ -105,7 +111,8 @@ public sealed class SignalOutcomeRunner
                 countUntil = UsEquitySession.EvaluationEnd(signal.CreatedAt, expiresAt, _stockOptions);
             }
 
-            ExitTargetEvaluator.Apply(signal, klines, now, countUntil);
+            var btcForSignal = signal.Coin.CoinType == CoinType.Crypto ? btcKlines : null;
+            ExitTargetEvaluator.Apply(signal, klines, now, countUntil, btcForSignal);
             changed = true;
         }
 

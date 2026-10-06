@@ -127,6 +127,84 @@ public sealed class SignalEngineTests
         Assert.Contains(result.Reasons, reason => reason.Contains("açık işlem", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void CalculateScore_DoesNotGiveFullOpenInterestForASmallIncrease()
+    {
+        var options = Options.Create(new BotOptions());
+        var engine = new SignalEngine(new TechnicalAnalysisService(), options);
+        var asOf = new DateTimeOffset(2026, 9, 30, 12, 30, 0, TimeSpan.Zero);
+        var snapshot = new MarketSnapshot
+        {
+            Symbol = "TESTUSDT",
+            CurrentPrice = 80m,
+            OpenInterestChangePct4H = 0.4m,
+            Klines4H =
+            [
+                Candle(asOf.AddHours(-8), 100m, 90m, 101m, 89m),
+                Candle(asOf.AddHours(-4), 90m, 100m, 101m, 89m),
+                Candle(asOf, 100m, 80m, 101m, 79m)
+            ]
+        };
+
+        var result = engine.CalculateScore(snapshot, MarketRegime.RiskOn, asOf);
+
+        Assert.Equal(8, result.Breakdown["oi"]);
+    }
+
+    [Fact]
+    public void CalculateScore_AddsBitcoinRelativeStrengthFromTheLastClosedFourHourCandle()
+    {
+        var options = Options.Create(new BotOptions());
+        var engine = new SignalEngine(new TechnicalAnalysisService(), options);
+        var asOf = new DateTimeOffset(2026, 9, 30, 12, 30, 0, TimeSpan.Zero);
+        var snapshot = new MarketSnapshot
+        {
+            Symbol = "ETHUSDT",
+            CurrentPrice = 110m,
+            Klines4H =
+            [
+                Candle(asOf.AddHours(-8), 100m, 100m, 101m, 99m),
+                Candle(asOf.AddHours(-4), 100m, 110m, 111m, 99m)
+            ]
+        };
+        var btc = new BtcSnapshot
+        {
+            Klines4H =
+            [
+                Candle(asOf.AddHours(-8), 100m, 100m, 101m, 99m),
+                Candle(asOf.AddHours(-4), 100m, 100m, 101m, 99m)
+            ]
+        };
+
+        var result = engine.CalculateScore(snapshot, MarketRegime.RiskOn, asOf, btc);
+
+        Assert.Equal(8, result.Breakdown["btc_rs"]);
+        Assert.Equal(10m, result.BtcRelativePct);
+        Assert.Contains(result.Reasons, reason => reason.Contains("Bitcoin'den", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Resolve_DowngradesAStrongLongThatLaggedBitcoin()
+    {
+        var risks = new List<string>();
+
+        var type = CryptoSignalTypeRule.Resolve(90, 85, -0.2m, risks);
+
+        Assert.Equal(SignalType.LongCandidate, type);
+        Assert.Contains(CryptoSignalTypeRule.StrongDowngradeRisk, risks);
+    }
+
+    [Fact]
+    public void Resolve_KeepsAStrongLongThatLedBitcoin()
+    {
+        var risks = new List<string>();
+
+        var type = CryptoSignalTypeRule.Resolve(90, 85, 1.2m, risks);
+
+        Assert.Equal(SignalType.StrongLongCandidate, type);
+        Assert.Empty(risks);
+    }
+
     private static Kline Candle(DateTimeOffset openTime, decimal open, decimal close, decimal high, decimal low)
     {
         return new Kline

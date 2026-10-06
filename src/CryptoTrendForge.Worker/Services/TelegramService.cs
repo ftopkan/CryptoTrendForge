@@ -33,6 +33,8 @@ public sealed class TelegramService
         ScoreResult scoreResult,
         MarketSnapshot snapshot,
         CoinType coinType = CoinType.Crypto,
+        decimal? btcPrice = null,
+        IReadOnlyList<(string Symbol, int Score)>? leaders = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_telegramOptions.BotToken) || string.IsNullOrWhiteSpace(_telegramOptions.ChatId))
@@ -45,7 +47,7 @@ public sealed class TelegramService
         {
             var client = _httpClientFactory.CreateClient();
             var url = $"https://api.telegram.org/bot{_telegramOptions.BotToken}/sendMessage";
-            var message = BuildMessage(signal, scoreResult, snapshot, coinType);
+            var message = BuildMessage(signal, scoreResult, snapshot, coinType, btcPrice, leaders);
             var request = new
             {
                 chat_id = _telegramOptions.ChatId,
@@ -170,7 +172,13 @@ public sealed class TelegramService
 
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
 
-    private string BuildMessage(Signal signal, ScoreResult scoreResult, MarketSnapshot snapshot, CoinType coinType)
+    private string BuildMessage(
+        Signal signal,
+        ScoreResult scoreResult,
+        MarketSnapshot snapshot,
+        CoinType coinType,
+        decimal? btcPrice,
+        IReadOnlyList<(string Symbol, int Score)>? leaders)
     {
         var sb = new StringBuilder();
         var isStock = coinType == CoinType.Stock;
@@ -178,7 +186,7 @@ public sealed class TelegramService
             ? isStock ? "📊 HİSSE GÜÇLÜ LONG ADAYI" : "🔥 GÜÇLÜ LONG ADAYI"
             : isStock ? "📊 HİSSE LONG ADAYI" : "🟢 LONG ADAYI";
 
-        var plan = PositionPlan.Create(snapshot.CurrentPrice, scoreResult.SupportLevel);
+        var plan = PositionPlan.Create(snapshot.CurrentPrice, scoreResult.SupportLevel, isStock ? null : btcPrice);
 
         sb.AppendLine(typeText);
         sb.AppendLine();
@@ -209,6 +217,10 @@ public sealed class TelegramService
         if (!isStock)
         {
             sb.AppendLine($"📌 Açık işlem: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("oi"))}/15");
+            if (scoreResult.Breakdown.ContainsKey("btc_rs"))
+            {
+                sb.AppendLine($"🟠 Bitcoin'e göre: {FormatPoints(scoreResult.Breakdown.GetValueOrDefault("btc_rs"))}/8");
+            }
         }
         sb.AppendLine($"✨ Mum yapısı bonusu: {FormatPoints(scoreResult.PatternBonus)}/{_botOptions.PatternBonusPoints.ToString(Turkish)}");
         sb.AppendLine();
@@ -230,9 +242,27 @@ public sealed class TelegramService
             }
         }
 
-        sb.AppendLine();
-        sb.AppendLine($"🆔 Sinyal no: {signal.Id}");
+        AppendLeaders(sb, leaders, isStock);
         return sb.ToString();
+    }
+
+    private static void AppendLeaders(StringBuilder sb, IReadOnlyList<(string Symbol, int Score)>? leaders, bool isStock)
+    {
+        if (leaders is null || leaders.Count == 0)
+        {
+            return;
+        }
+
+        var title = isStock
+            ? "Bu taramada en yüksek puanlı hisseler"
+            : "Bu taramada en yüksek puanlı coinler";
+        sb.AppendLine();
+        sb.AppendLine($"🏆 {title}");
+        for (var i = 0; i < leaders.Count; i++)
+        {
+            var item = leaders[i];
+            sb.AppendLine($"{i + 1}. {item.Symbol} · {item.Score}");
+        }
     }
 
     private static void AppendPositionPlan(StringBuilder sb, PositionPlan plan)
@@ -244,6 +274,12 @@ public sealed class TelegramService
         sb.AppendLine($"• Temkinli: ${FormatPrice(plan.CautiousExit)} ({FormatMovePct(plan.Entry, plan.CautiousExit)})");
         sb.AppendLine($"• Dengeli: ${FormatPrice(plan.BalancedExit)} ({FormatMovePct(plan.Entry, plan.BalancedExit)})");
         sb.AppendLine($"• Geniş: ${FormatPrice(plan.WideExit)} ({FormatMovePct(plan.Entry, plan.WideExit)})");
+        if (plan.BtcEntryPrice is decimal btc && plan.CoinBtcRatio is decimal ratio)
+        {
+            sb.AppendLine($"BTC giriş: ${FormatPrice(btc)} · Coin/BTC: {ratio.ToString("0.##########", Turkish)}");
+            sb.AppendLine("BTC yatay kalırsa hedefler dolar bazında geçerli.");
+            sb.AppendLine("BTC %3'ten fazla düşerse temkinli hedef zor.");
+        }
     }
 
     private static string FormatPrice(decimal value)

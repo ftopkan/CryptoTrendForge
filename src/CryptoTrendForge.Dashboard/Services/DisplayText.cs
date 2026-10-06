@@ -60,6 +60,7 @@ public static class DisplayText
             "volume" => "Hacim",
             "support" => "Destek",
             "oi" => "Açık işlem",
+            "btc_rs" => "Bitcoin'e göre",
             "pattern_bonus" => "Mum bonusu",
             _ => key
         };

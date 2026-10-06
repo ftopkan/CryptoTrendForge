@@ -18,7 +18,7 @@
 </div>
 
 @code {
-    private static readonly string[] ScoreOrder = ["trend", "rsi", "volume", "support", "oi", "pattern_bonus"];
+    private static readonly string[] ScoreOrder = ["trend", "rsi", "volume", "support", "oi", "btc_rs", "pattern_bonus"];
 
     [Parameter] public Dictionary<string, int> Breakdown { get; set; } = new();
     [Parameter] public bool IsStock { get; set; }
@@ -41,6 +41,7 @@
             "rsi" or "volume" => 20,
             "support" => IsStock ? 35 : 20,
             "oi" => 15,
+            "btc_rs" => 8,
             "pattern_bonus" => 5,
             _ => Math.Max(1, 25)
         };

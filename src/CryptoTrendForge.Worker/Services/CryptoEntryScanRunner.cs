@@ -79,6 +79,7 @@ public sealed class CryptoEntryScanRunner
         var bestScore = 0;
         string? bestSymbol = null;
         var topScores = new List<(string Symbol, int Score)>();
+        var pendingSignals = new List<(Signal Signal, ScoreResult Score, MarketSnapshot Snapshot)>();
         foreach (var coin in coins)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -97,7 +98,10 @@ public sealed class CryptoEntryScanRunner
                 continue;
             }
 
-            var scoreResult = _signalEngine.CalculateScore(snapshot, regimeResult.Regime);
+            var scoreResult = _signalEngine.CalculateScore(
+                snapshot,
+                regimeResult.Regime,
+                btcSnapshot: btcSnapshot);
             var (candidateThreshold, strongThreshold) = ResolveThresholds(regimeResult.Regime);
             await _signalRepository.RecordNearMissIfNeededAsync(
                 coin,
@@ -151,9 +155,11 @@ public sealed class CryptoEntryScanRunner
                 await _signalRepository.MarkSupersededAsync(activeSignal.Id, cancellationToken);
             }
 
-            var signalType = scoreResult.TotalScore >= strongThreshold
-                ? SignalType.StrongLongCandidate
-                : SignalType.LongCandidate;
+            var signalType = CryptoSignalTypeRule.Resolve(
+                scoreResult.TotalScore,
+                strongThreshold,
+                scoreResult.BtcRelativePct,
+                scoreResult.Risks);
 
             var signal = await _signalRepository.CreateSignalAsync(
                 coin,
@@ -166,17 +172,29 @@ public sealed class CryptoEntryScanRunner
                 snapshot.FundingRate,
                 regimeResult.Regime.ToString(),
                 now.AddHours(_botOptions.CooldownHours),
+                btcSnapshot.CurrentPrice,
                 cancellationToken);
-
-            var sent = await _telegramService.SendSignalAsync(signal, scoreResult, snapshot, CoinType.Crypto, cancellationToken);
-            if (sent)
-            {
-                await _signalRepository.ActivateSignalAsync(signal.Id, cancellationToken);
-                _marketDataCache.Set($"active_signal:{coin.Symbol}".ToLowerInvariant(), true, TimeSpan.FromHours(_botOptions.CooldownHours));
-            }
+            pendingSignals.Add((signal, scoreResult, snapshot));
         }
 
         var top3 = topScores.OrderByDescending(x => x.Score).Take(3).ToList();
+        foreach (var pending in pendingSignals)
+        {
+            var sent = await _telegramService.SendSignalAsync(
+                pending.Signal,
+                pending.Score,
+                pending.Snapshot,
+                CoinType.Crypto,
+                btcSnapshot.CurrentPrice,
+                top3,
+                cancellationToken);
+            if (sent)
+            {
+                await _signalRepository.ActivateSignalAsync(pending.Signal.Id, cancellationToken);
+                _marketDataCache.Set($"active_signal:{pending.Snapshot.Symbol}".ToLowerInvariant(), true, TimeSpan.FromHours(_botOptions.CooldownHours));
+            }
+        }
+
         var (candThreshold, _) = ResolveThresholds(regimeResult.Regime);
         _logger.LogInformation(
             "Scan finished. Regime {Regime}. Best score {BestScore} on {BestSymbol}. Top3: {Top3}",

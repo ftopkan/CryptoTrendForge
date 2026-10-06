@@ -4,7 +4,15 @@ namespace CryptoTrendForge.Core.Domain;
 
 public static class ExitTargetEvaluator
 {
-    public static void Apply(Signal signal, IReadOnlyList<Kline> klines, DateTimeOffset now, DateTimeOffset? countUntil = null)
+    public const decimal BtcBreakDropPct = 3m;
+    public const string BtcBreakReason = "BTC bozulması";
+
+    public static void Apply(
+        Signal signal,
+        IReadOnlyList<Kline> klines,
+        DateTimeOffset now,
+        DateTimeOffset? countUntil = null,
+        IReadOnlyList<Kline>? btcKlines = null)
     {
         if (signal.TargetsClosedAt is not null
             || signal.EntryPrice is null
@@ -26,10 +34,16 @@ public static class ExitTargetEvaluator
         }
         var entry = signal.EntryPrice.Value;
         var filled = entry >= signal.SignalPrice;
+        var btcBreakAt = FindBtcBreak(signal.BtcEntryPrice, btcKlines, windowStart, windowEnd);
 
         foreach (var candle in klines.OrderBy(x => x.OpenTime))
         {
             if (candle.OpenTime < windowStart || candle.OpenTime >= windowEnd)
+            {
+                continue;
+            }
+
+            if (btcBreakAt is DateTimeOffset brokenAt && candle.OpenTime >= brokenAt)
             {
                 continue;
             }
@@ -73,10 +87,43 @@ public static class ExitTargetEvaluator
             });
         }
 
-        if (now >= windowEnd)
+        if (btcBreakAt is not null)
+        {
+            signal.TargetsClosedAt = now;
+            signal.TargetsCloseReason = BtcBreakReason;
+        }
+        else if (now >= windowEnd)
         {
             signal.TargetsClosedAt = now;
         }
+    }
+
+    private static DateTimeOffset? FindBtcBreak(
+        decimal? btcEntryPrice,
+        IReadOnlyList<Kline>? btcKlines,
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd)
+    {
+        if (btcEntryPrice is not > 0m || btcKlines is null)
+        {
+            return null;
+        }
+
+        var floor = btcEntryPrice.Value * (1m - (BtcBreakDropPct / 100m));
+        foreach (var candle in btcKlines.OrderBy(x => x.OpenTime))
+        {
+            if (candle.OpenTime < windowStart || candle.OpenTime >= windowEnd)
+            {
+                continue;
+            }
+
+            if (candle.Low <= floor)
+            {
+                return candle.OpenTime;
+            }
+        }
+
+        return null;
     }
 
     private static void MarkIfTouched(
